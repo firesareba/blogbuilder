@@ -1,0 +1,27 @@
+{
+  "name": "blogbuilder",
+  "version": "0.1.0",
+  "description": "Self-hosted, git-native visual website & blogging builder.",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "blog": "./cli/blog.js"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "cli": "node cli/blog.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "multer": "^1.4.5-lts.1",
+    "simple-git": "^3.25.0",
+    "gray-matter": "^4.0.3",
+    "marked": "^13.0.2",
+    "commander": "^12.1.0",
+    "jsdom": "^24.1.1",
+    "nanoid": "^3.3.7"
+  }
+}

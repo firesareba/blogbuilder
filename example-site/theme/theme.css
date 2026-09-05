@@ -1,0 +1,204 @@
+/* Ensō theme — a quiet, editorial personal-site theme.
+   Palette: paper #F5F1E8, ink #23211D, indigo #263A52, hanko #A3323B, mist #DCD6C8 */
+
+:root {
+  --paper: #F5F1E8;
+  --ink: #23211D;
+  --indigo: #263A52;
+  --hanko: #A3323B;
+  --mist: #DCD6C8;
+  --moss: #5C6B4F;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  margin: 0 0 0.4em;
+  color: var(--ink);
+}
+
+.wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+a { color: var(--indigo); }
+
+/* header */
+.site-header {
+  border-bottom: 1px solid var(--mist);
+  padding: 22px 0;
+}
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.site-title {
+  font-family: "Shippori Mincho", serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.site-nav { display: flex; gap: 22px; }
+.nav-link {
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 15px;
+  border-bottom: 1px solid transparent;
+}
+.nav-link:hover { border-bottom-color: var(--indigo); }
+
+/* hero */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 72px 28px 56px;
+}
+.enso {
+  width: 128px;
+  height: 128px;
+  flex: none;
+  opacity: 0.9;
+}
+.headline {
+  font-size: 34px;
+  line-height: 1.25;
+  max-width: 14ch;
+}
+.hero-subhead {
+  max-width: 46ch;
+  color: #4b483f;
+  margin: 0 0 26px;
+}
+.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+
+.btn {
+  font-family: inherit;
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--hanko);
+  color: var(--paper);
+}
+.btn-primary:hover { background: #8c2933; }
+.btn-ghost {
+  background: transparent;
+  border-color: var(--mist);
+  color: var(--ink);
+}
+.btn-ghost:hover { border-color: var(--indigo); color: var(--indigo); }
+
+/* about */
+.about {
+  display: flex;
+  gap: 36px;
+  align-items: flex-start;
+  padding: 8px 28px 64px;
+}
+.profile-image {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  flex: none;
+  border: 1px solid var(--mist);
+}
+.about-text { color: #4b483f; max-width: 52ch; }
+.section-heading { font-size: 24px; margin-bottom: 0.5em; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--mist);
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* posts */
+.posts-section { padding: 48px 28px; }
+.post-list { display: flex; flex-direction: column; }
+.bb-post-card {
+  display: block;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--mist);
+  text-decoration: none;
+  color: var(--ink);
+}
+.bb-post-card:first-child { padding-top: 0; }
+.bb-post-card h3 {
+  font-size: 19px;
+  margin: 0 0 4px;
+}
+.bb-post-meta {
+  font-size: 13px;
+  color: var(--moss);
+  margin: 0 0 6px;
+}
+.bb-post-excerpt {
+  font-size: 15px;
+  color: #4b483f;
+  margin: 0;
+}
+.bb-empty { color: #7a7768; font-style: italic; }
+
+/* footer */
+.site-footer {
+  border-top: 1px solid var(--mist);
+  padding: 26px 0 40px;
+}
+.footer-text { font-size: 13px; color: #7a7768; }
+
+/* single post page */
+.post-page { padding: 56px 28px 80px; }
+.post-title { font-size: 32px; max-width: 20ch; }
+.post-meta { font-size: 13px; color: var(--moss); margin-bottom: 32px; }
+.post-content { max-width: 66ch; }
+.post-content p { margin: 0 0 1.1em; }
+.post-content h2 { font-size: 22px; margin-top: 1.6em; }
+.post-content blockquote {
+  margin: 1.4em 0;
+  padding-left: 18px;
+  border-left: 3px solid var(--hanko);
+  color: #4b483f;
+}
+.post-content code {
+  background: var(--mist);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.post-content pre {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 16px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.post-content pre code { background: none; padding: 0; }
+.back-link { display: inline-block; margin-bottom: 28px; font-size: 14px; }
+
+@media (max-width: 620px) {
+  .hero { flex-direction: column; align-items: flex-start; padding-top: 48px; }
+  .enso { width: 84px; height: 84px; }
+  .about { flex-direction: column; }
+  .headline { font-size: 28px; max-width: none; }
+}

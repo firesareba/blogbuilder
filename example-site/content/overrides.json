@@ -1,0 +1,43 @@
+{
+  "overrides": {
+    "headline": {
+      "text": "why i built this"
+    },
+    "clickifyouhateschoology": {
+      "style": {
+        "transform": "translate(-4px, 2px)"
+      }
+    },
+    "profile-image": {
+      "style": {
+        "transform": "scale(1.1, 1.1)"
+      }
+    },
+    "hero-subhead": {
+      "text": "Notes on things I build, break, and eventually understand — written down before I forget them."
+    },
+    "hero": {
+      "order": [
+        "headline",
+        "hero-subhead",
+        "clickifyouhateschoology",
+        "hero-cta",
+        "hero-subscribe"
+      ]
+    },
+    "hero-subscribe": {
+      "visible": true
+    }
+  },
+  "added": [
+    {
+      "id": "hero-subscribe",
+      "tag": "button",
+      "kind": "text",
+      "parent": "hero",
+      "text": "Subscribe",
+      "href": "/subscribe",
+      "style": {}
+    }
+  ]
+}

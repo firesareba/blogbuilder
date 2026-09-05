@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  blogbuilder:
+    build: .
+    ports:
+      - "${PORT:-4321}:4321"
+    environment:
+      - PORT=4321
+      - BLOG_REPO_PATH=/data/site
+    volumes:
+      # your actual site repo lives here, on the host - this is the thing
+      # you'd git clone/push independently of the container itself.
+      - ./data/site:/data/site
+    restart: unless-stopped
