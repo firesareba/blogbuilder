@@ -6,6 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+const { z } = require("zod");
 const engine = require("../engine/builderEngine");
 const content = require("../engine/contentEngine");
 const media = require("../engine/mediaEngine");
@@ -52,9 +53,24 @@ function createRouter({ getRepoPath }) {
     limits: { fileSize: 15 * 1024 * 1024 },
   });
 
+  const queues = new Map();
+  async function withLock(repoPath, fn) {
+    const prev = queues.get(repoPath) || Promise.resolve();
+    let release;
+    const next = new Promise((r) => (release = r));
+    queues.set(repoPath, next);
+    try {
+      await prev;
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
   const wrap = (fn) => (req, res) => {
     try {
-      const result = fn(req, res);
+      const exec = () => fn(req, res);
+      const result = req.method !== "GET" ? withLock(req.repoPath, exec) : exec();
       if (result instanceof Promise) {
         result.then((data) => res.json(data)).catch((err) => sendError(res, err));
       } else {
@@ -65,9 +81,42 @@ function createRouter({ getRepoPath }) {
     }
   };
 
+  function validate(schema, body) {
+    const r = schema.safeParse(body || {});
+    if (!r.success) {
+      const err = new engine.BuilderError("Invalid request body: " + r.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; "), "INVALID");
+      throw err;
+    }
+    return r.data;
+  }
+
+  const commitSchema = z.object({ message: z.string().min(1).max(500) });
+  const textSchema = z.object({ value: z.string().max(20000) });
+  const postCreateSchema = z.object({
+    title: z.string().min(1).max(200).optional(),
+    slug: z.string().max(200).optional(),
+    author: z.string().max(200).optional(),
+    tags: z.array(z.string().max(50)).max(20).optional(),
+    featuredImage: z.string().max(2000).optional(),
+    body: z.string().max(200000).optional(),
+  });
+  const postUpdateSchema = postCreateSchema.extend({
+    date: z.string().max(50).optional(),
+    published: z.boolean().optional(),
+    excerpt: z.string().max(2000).optional(),
+  });
+  const aiOpsSchema = z.object({
+    provider: z.string().min(1),
+    apiKey: z.string().min(1),
+    model: z.string().max(200).optional(),
+    instruction: z.string().min(1).max(10000),
+  });
+  const aiApplySchema = z.object({ operations: z.array(z.object({ op: z.string().min(1) }).passthrough()) });
+
   function sendError(res, err) {
     const status = err.code === "NOT_FOUND" ? 404
       : err.code === "LOCKED" ? 403
+        : err.code === "INVALID" ? 400
         : err instanceof engine.BuilderError ? 400 : 500;
     // eslint-disable-next-line no-console
     console.error("[api error]", err.message);
@@ -91,7 +140,7 @@ function createRouter({ getRepoPath }) {
   router.post("/elements", wrap((req) => engine.createElement(req.repoPath, req.body)));
   router.delete("/elements/:id", wrap((req) => engine.deleteElement(req.repoPath, req.params.id)));
   router.post("/elements/:id/duplicate", wrap((req) => engine.duplicateElement(req.repoPath, req.params.id)));
-  router.post("/elements/:id/text", wrap((req) => engine.updateText(req.repoPath, req.params.id, req.body.value)));
+  router.post("/elements/:id/text", wrap((req) => engine.updateText(req.repoPath, req.params.id, validate(textSchema, req.body).value)));
   router.post("/elements/:id/image", wrap((req) => engine.updateImage(req.repoPath, req.params.id, req.body)));
   router.post("/elements/:id/link", wrap((req) => engine.updateLink(req.repoPath, req.params.id, req.body.href)));
   router.post("/elements/:id/style", wrap((req) => engine.updateStyle(req.repoPath, req.params.id, req.body)));
@@ -104,8 +153,8 @@ function createRouter({ getRepoPath }) {
   // -- posts ------------------------------------------------------------------
   router.get("/posts", wrap((req) => content.getPosts(req.repoPath)));
   router.get("/posts/:slug", wrap((req) => content.getPost(req.repoPath, req.params.slug)));
-  router.post("/posts", wrap((req) => content.createPost(req.repoPath, req.body)));
-  router.put("/posts/:slug", wrap((req) => content.updatePost(req.repoPath, req.params.slug, req.body)));
+  router.post("/posts", wrap((req) => content.createPost(req.repoPath, validate(postCreateSchema, req.body))));
+  router.put("/posts/:slug", wrap((req) => content.updatePost(req.repoPath, req.params.slug, validate(postUpdateSchema, req.body))));
   router.delete("/posts/:slug", wrap((req) => content.deletePost(req.repoPath, req.params.slug)));
   router.post("/posts/:slug/publish", wrap((req) => content.setPublished(req.repoPath, req.params.slug, true)));
   router.post("/posts/:slug/unpublish", wrap((req) => content.setPublished(req.repoPath, req.params.slug, false)));
@@ -148,7 +197,7 @@ function createRouter({ getRepoPath }) {
   router.get("/git/status", wrap((req) => git.status(req.repoPath)));
   router.get("/git/diff", wrap((req) => git.diff(req.repoPath, req.query.file)));
   router.get("/git/log", wrap((req) => git.log(req.repoPath)));
-  router.post("/git/commit", wrap((req) => git.commit(req.repoPath, req.body.message)));
+  router.post("/git/commit", wrap((req) => git.commit(req.repoPath, validate(commitSchema, req.body).message)));
   router.post("/git/push", wrap((req) => git.push(req.repoPath, req.body)));
   router.post("/git/pull", wrap((req) => git.pull(req.repoPath, req.body)));
   router.post("/git/remote", wrap((req) => git.setRemote(req.repoPath, req.body.url, req.body.remote)));
@@ -159,13 +208,13 @@ function createRouter({ getRepoPath }) {
 
   // -- AI copilot ---------------------------------------------------------
   router.post("/ai/operations", wrap(async (req) => {
+    const body = validate(aiOpsSchema, req.body);
     const elements = engine.getElements(req.repoPath);
-    const ops = await ai.generateOperations({ ...req.body, elements });
+    const ops = await ai.generateOperations({ ...body, elements });
     return { operations: ops };
   }));
   router.post("/ai/apply", wrap((req) => {
-    const { operations } = req.body;
-    if (!Array.isArray(operations)) throw new engine.BuilderError("operations must be an array", "INVALID");
+    const { operations } = validate(aiApplySchema, req.body);
     const results = operations.map((op) => {
       try {
         return { op, ok: true, result: applyOperation(req.repoPath, op) };
@@ -221,10 +270,11 @@ function createRouter({ getRepoPath }) {
     fs.mkdirSync(targetDir, { recursive: true });
     try {
       const zip = new AdmZip(req.file.path);
+      const resolvedTarget = path.resolve(targetDir);
       for (const zipEntry of zip.getEntries()) {
-        const fullPath = path.join(targetDir, zipEntry.entryName);
-        // Basic zip-slip prevention: ensure extracted path is within targetDir
-        if (!fullPath.startsWith(targetDir + path.sep) && !fullPath.startsWith(targetDir + "/")) {
+        const fullPath = path.resolve(targetDir, zipEntry.entryName);
+        // Zip-slip prevention: resolved path must stay inside target dir
+        if (fullPath !== resolvedTarget && !fullPath.startsWith(resolvedTarget + path.sep)) {
           throw new engine.BuilderError("Zip-slip detected: invalid path in zip file", "ZIP_SLIP");
         }
         if (zipEntry.isDirectory) {

@@ -10,7 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const matter = require("gray-matter");
-const { loadConfig, loadPosts, postsDir, slugify } = require("./siteModel");
+const { loadConfig, loadPosts, postsDir, slugify, atomicWriteFileSync } = require("./siteModel");
 const { BuilderError } = require("./builderEngine");
 
 function getPosts(repoPath) {
@@ -48,7 +48,7 @@ function createPost(repoPath, { title, slug, author, tags, featuredImage, body }
     excerpt: "",
   };
   const content = matter.stringify(body || "\n", frontmatter);
-  fs.writeFileSync(file, content, "utf8");
+  atomicWriteFileSync(file, content);
   return getPost(repoPath, finalSlug);
 }
 
@@ -79,9 +79,9 @@ function updatePost(repoPath, slug, patch) {
     const newFile = postPath(repoPath, config, newSlug);
     if (fs.existsSync(newFile)) throw new BuilderError(`A post with slug "${newSlug}" already exists`, "DUPLICATE_SLUG");
     fs.unlinkSync(file);
-    fs.writeFileSync(newFile, newContent, "utf8");
+    atomicWriteFileSync(newFile, newContent);
   } else {
-    fs.writeFileSync(file, newContent, "utf8");
+    atomicWriteFileSync(file, newContent);
   }
   return getPost(repoPath, newSlug);
 }

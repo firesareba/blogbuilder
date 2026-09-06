@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "cli": "node cli/blog.js"
+    "cli": "node cli/blog.js",
+    "test": "node --test tests/engine.test.js",
+    "check": "node --check server/index.js && node --check server/api/routes.js && node --check server/engine/siteModel.js && node --check server/engine/contentEngine.js"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",

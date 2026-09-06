@@ -15,12 +15,13 @@ ENV BLOG_REPO_PATH=/data/site
 
 # The repo BlogBuilder edits lives in a volume so it survives container
 # restarts/rebuilds. Seed it from the bundled example-site on first boot.
-RUN mkdir -p /data
-COPY example-site /app/example-site-seed
+RUN mkdir -p /data /app/uploads && chown -R node:node /app /data
+COPY --chown=node:node example-site /app/example-site-seed
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=node:node docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 4321
+USER node
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]

@@ -39,9 +39,21 @@ function loadOverrides(repoPath) {
   }
 }
 
+function atomicWriteFileSync(filePath, content) {
+  const dir = path.dirname(filePath);
+  const tmpPath = path.join(dir, `.tmp-${path.basename(filePath)}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`);
+  
+  const fd = fs.openSync(tmpPath, "w");
+  fs.writeFileSync(fd, content, "utf8");
+  fs.fsyncSync(fd);
+  fs.closeSync(fd);
+  
+  fs.renameSync(tmpPath, filePath);
+}
+
 function saveOverrides(repoPath, overridesObj) {
   const p = path.join(repoPath, "content", "overrides.json");
-  fs.writeFileSync(p, JSON.stringify(overridesObj, null, 2) + "\n", "utf8");
+  atomicWriteFileSync(p, JSON.stringify(overridesObj, null, 2) + "\n");
 }
 
 function slugify(str) {
@@ -194,4 +206,5 @@ module.exports = {
   postsDir,
   buildEffectiveTree,
   slugify,
+  atomicWriteFileSync,
 };

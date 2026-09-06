@@ -57,7 +57,10 @@ app.get("/health", (req, res) => {
 });
 
 // The API - everything the GUI, CLI, and AI copilot go through.
-app.use("/api", createRouter({ getRepoPath }));
+const apiRouter = createRouter({ getRepoPath });
+app.use("/api/ai/operations", aiLimiter);
+app.use("/api/ai/article-assist", aiLimiter);
+app.use("/api", apiRouter);
 
 // Allow switching which repository is loaded without restarting the server.
 app.get("/api/repo", (req, res) => res.json({ repoPath: currentRepoPath }));
@@ -98,9 +101,17 @@ app.use("/dist", (req, res, next) => {
 // The builder GUI itself.
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`BlogBuilder running at http://localhost:${PORT}`);
-  // eslint-disable-next-line no-console
-  console.log(`Repo: ${currentRepoPath}`);
+const server = app.listen(PORT, () => {
+  pino.info(`BlogBuilder running at http://localhost:${PORT} repo=${currentRepoPath}`);
 });
+
+function shutdown(signal) {
+  pino.info(`${signal} received, shutting down`);
+  server.close(() => {
+    pino.info("HTTP server closed");
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

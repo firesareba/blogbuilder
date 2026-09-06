@@ -1,0 +1,20 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: |
+          PORT=4321 BLOG_REPO_PATH=$GITHUB_WORKSPACE/example-site node server/index.js &
+          SRV=$!
+          sleep 4
+          curl -sf http://localhost:4321/api/site
+          kill $SRV
