@@ -4,9 +4,13 @@ require("dotenv").config();
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
-const cors = require("cors");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
+const pino = require("pino")();
 
 const { createRouter } = require("./api/routes");
+const { createSession, authRequired, ADMIN_USER, ADMIN_PASS } = require("./middleware/auth");
 
 const PORT = process.env.PORT || 4321;
 const DEFAULT_REPO = path.resolve(
@@ -20,8 +24,37 @@ function getRepoPath() {
 }
 
 const app = express();
-app.use(cors());
+app.use(helmet());
+app.use(cookieParser());
 app.use(express.json({ limit: "5mb" }));
+
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true });
+const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, standardHeaders: true });
+const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true });
+
+app.use(generalLimiter);
+
+app.post("/api/login", loginLimiter, (req, res) => {
+  const { username, password } = req.body || {};
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    const token = createSession(username);
+    res.cookie("session", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "Strict", maxAge: 24 * 3600 * 1000 });
+    return res.json({ ok: true });
+  }
+  return res.status(401).json({ error: "Invalid credentials" });
+});
+
+app.post("/api/logout", (req, res) => {
+  res.clearCookie("session");
+  res.json({ ok: true });
+});
+
+app.get("/health", (req, res) => {
+  const repoOk = fs.existsSync(currentRepoPath) && fs.existsSync(path.join(currentRepoPath, "content", "config.json"));
+  const diskFree = (() => { try { require("child_process").execSync("df -k ."); return true; } catch { return false; } })();
+  const ok = repoOk && diskFree;
+  res.status(ok ? 200 : 500).json({ ok, repoOk, diskFree });
+});
 
 // The API - everything the GUI, CLI, and AI copilot go through.
 app.use("/api", createRouter({ getRepoPath }));
