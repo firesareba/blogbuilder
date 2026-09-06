@@ -1,0 +1,9 @@
+{
+  "id": "obsidian",
+  "name": "Obsidian",
+  "description": "A modern, dark-mode editorial personal site and blog theme.",
+  "author": "BlogBuilder Team",
+  "version": "1.0.0",
+  "preview": "/themes/obsidian/preview.png",
+  "path": "themes/obsidian"
+}

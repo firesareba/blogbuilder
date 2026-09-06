@@ -1,0 +1,9 @@
+{
+  "id": "enso",
+  "name": "Ensō",
+  "description": "A quiet, editorial personal site and blog theme with light paper tones.",
+  "author": "BlogBuilder Team",
+  "version": "1.0.0",
+  "preview": "/example-site/preview.png",
+  "path": "example-site"
+}

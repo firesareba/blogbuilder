@@ -884,6 +884,8 @@ async function applyPendingOps() {
 // ===========================================================================
 // SETTINGS TAB
 // ===========================================================================
+let selectedThemeId = null;
+
 function loadSettingsIntoForm() {
   document.getElementById("aiProvider").value = Settings.provider;
   document.getElementById("aiModel").value = Settings.model;
@@ -891,7 +893,74 @@ function loadSettingsIntoForm() {
   api("GET", "/site").then((s) => {
     document.getElementById("repoPathDisplay").textContent = `${s.repoPath} · ${s.postCount} posts (${s.publishedCount} published)`;
   }).catch(() => {});
+  loadThemes();
 }
+
+async function loadThemes() {
+  const grid = document.getElementById("themeGrid");
+  grid.innerHTML = '<p class="muted small">Loading themes…</p>';
+  try {
+    const themes = await api("GET", "/themes");
+    grid.innerHTML = "";
+    for (const t of themes) {
+      const card = document.createElement("div");
+      card.className = "theme-card";
+      card.dataset.themeId = t.id;
+      card.innerHTML = `
+        ${t.preview ? `<img src="${t.preview}" alt="${escapeHtml(t.name)} preview" onerror="this.style.display='none'">` : ''}
+        <h3>${escapeHtml(t.name)}</h3>
+        <p>${escapeHtml(t.description || "")}</p>
+        <button class="btn btn-primary btn-sm apply-btn" ${selectedThemeId === t.id ? "disabled" : ""}>
+          ${selectedThemeId === t.id ? "Applied" : "Apply this theme"}
+        </button>
+      `;
+      card.querySelector(".apply-btn").addEventListener("click", () => applyTheme(t.id));
+      card.addEventListener("click", (e) => {
+        if (e.target.classList.contains("apply-btn")) return;
+        document.querySelectorAll(".theme-card").forEach(c => c.classList.remove("selected"));
+        card.classList.add("selected");
+        selectedThemeId = t.id;
+        card.querySelector(".apply-btn").disabled = false;
+        card.querySelector(".apply-btn").textContent = "Apply this theme";
+      });
+      grid.appendChild(card);
+    }
+  } catch (e) {
+    grid.innerHTML = `<p class="muted small" style="color: var(--danger);">Failed to load themes: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function applyTheme(themeId) {
+  if (!themeId) return;
+  const btn = document.querySelector(`.theme-card[data-theme-id="${themeId}"] .apply-btn`);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Applying…";
+  }
+  try {
+    await api("POST", "/themes/apply", { themeId });
+    toast(`Theme "${themeId}" applied`);
+    selectedThemeId = themeId;
+    document.querySelectorAll(".theme-card").forEach(c => c.classList.remove("selected"));
+    const active = document.querySelector(`.theme-card[data-theme-id="${themeId}"]`);
+    if (active) active.classList.add("selected");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Applied";
+    }
+    await loadElements();
+    reloadCanvas();
+    PostsState.loaded = false;
+    loadSettingsIntoForm();
+  } catch (e) {
+    toast(e.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Apply this theme";
+    }
+  }
+}
+
 function initSettings() {
   document.getElementById("saveSettingsBtn").addEventListener("click", () => {
     Settings.save({
@@ -911,6 +980,44 @@ function initSettings() {
       toast("Repo loaded");
       loadElements(); reloadCanvas(); loadSettingsIntoForm();
       PostsState.loaded = false;
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+  document.getElementById("themeUploadBtn").addEventListener("click", async () => {
+    const input = document.getElementById("themeUploadInput");
+    const file = input.files[0];
+    if (!file) return toast("Pick a .zip first", true);
+    const fd = new FormData();
+    fd.append("theme", file);
+    toast("Uploading theme…");
+    try {
+      const res = await fetch("/api/themes/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      toast(`Theme "${data.id}" uploaded and applied`);
+      await loadThemes();
+      await applyTheme(data.id);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+}
+  });
+  document.getElementById("themeUploadBtn").addEventListener("click", async () => {
+    const input = document.getElementById("themeUploadInput");
+    const file = input.files[0];
+    if (!file) return toast("Pick a .zip first", true);
+    const fd = new FormData();
+    fd.append("theme", file);
+    toast("Uploading theme…");
+    try {
+      const res = await fetch("/api/themes/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      toast(`Theme "${data.id}" uploaded and applied`);
+      await loadThemes();
+      await applyTheme(data.id);
     } catch (e) {
       toast(e.message, true);
     }

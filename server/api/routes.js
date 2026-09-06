@@ -171,6 +171,103 @@ function createRouter({ getRepoPath }) {
     return { html: marked.parse(req.body.markdown || "") };
   }));
 
+  // -- themes -----------------------------------------------------------------
+  router.get("/themes", wrap(() => {
+    const list = [];
+    const root = path.resolve(__dirname, "../..");
+    
+    // Check built-in themes directory
+    const themesDir = path.join(root, "themes");
+    if (fs.existsSync(themesDir)) {
+      for (const d of fs.readdirSync(themesDir)) {
+        const jsonPath = path.join(themesDir, d, "theme.json");
+        if (fs.existsSync(jsonPath)) {
+          try {
+            list.push(JSON.parse(fs.readFileSync(jsonPath, "utf8")));
+          } catch {}
+        }
+      }
+    }
+    
+    // Also include the example-site (Ensō)
+    const ensoJson = path.join(root, "example-site", "theme.json");
+    if (fs.existsSync(ensoJson)) {
+      try {
+        list.push(JSON.parse(fs.readFileSync(ensoJson, "utf8")));
+      } catch {}
+    }
+    
+    return list;
+  }));
+
+  router.post("/themes/upload", upload.single("theme"), wrap((req) => {
+    if (!req.file) throw new engine.BuilderError("No theme zip file uploaded", "NO_FILE");
+    const { execSync } = require("child_process");
+    const themeName = path.basename(req.file.originalname, path.extname(req.file.originalname)).replace(/[^a-zA-Z0-9_-]/g, "");
+    const root = path.resolve(__dirname, "../..");
+    const targetDir = path.join(root, "themes", themeName);
+    
+    fs.mkdirSync(targetDir, { recursive: true });
+    try {
+      execSync(`unzip -o "${req.file.path}" -d "${targetDir}"`);
+      fs.unlinkSync(req.file.path);
+    } catch (e) {
+      throw new engine.BuilderError(`Failed to extract theme: ${e.message}`, "EXTRACT_FAILED");
+    }
+
+    // Write a fallback theme.json if none exists
+    const manifestPath = path.join(targetDir, "theme.json");
+    if (!fs.existsSync(manifestPath)) {
+      fs.writeFileSync(manifestPath, JSON.stringify({
+        id: themeName,
+        name: themeName.charAt(0).toUpperCase() + themeName.slice(1),
+        description: "Custom uploaded theme",
+        version: "1.0.0"
+      }, null, 2) + "\n");
+    }
+
+    return { ok: true, id: themeName };
+  }));
+
+  router.post("/themes/apply", wrap((req) => {
+    const { themeId } = req.body || {};
+    if (!themeId) throw new engine.BuilderError("themeId is required", "INVALID");
+
+    const root = path.resolve(__dirname, "../..");
+    let srcThemeDir = null;
+
+    if (themeId === "obsidian") {
+      srcThemeDir = path.join(root, "themes", "obsidian");
+    } else if (themeId === "enso") {
+      srcThemeDir = path.join(root, "example-site");
+    } else {
+      const candidate = path.join(root, "themes", themeId);
+      if (fs.existsSync(candidate)) srcThemeDir = candidate;
+    }
+
+    if (!srcThemeDir || !fs.existsSync(srcThemeDir)) {
+      throw new engine.BuilderError(`Theme "${themeId}" not found`, "NOT_FOUND");
+    }
+
+    const repo = req.repoPath;
+    const destTheme = path.join(repo, "theme");
+    fs.mkdirSync(destTheme, { recursive: true });
+
+    // Copy theme html/css/assets
+    const srcThemeFiles = path.join(srcThemeDir, "theme");
+    if (fs.existsSync(srcThemeFiles)) {
+      for (const file of fs.readdirSync(srcThemeFiles)) {
+        fs.copyFileSync(path.join(srcThemeFiles, file), path.join(destTheme, file));
+      }
+    }
+
+    // Reset overrides to clean state for new theme
+    const overridesPath = path.join(repo, "content", "overrides.json");
+    fs.writeFileSync(overridesPath, JSON.stringify({ overrides: {}, added: [] }, null, 2) + "\n", "utf8");
+
+    return { ok: true, applied: themeId };
+  }));
+
   return router;
 }
 

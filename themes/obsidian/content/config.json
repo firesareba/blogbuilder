@@ -1,0 +1,11 @@
+{
+  "title": "Obsidian",
+  "description": "A dark, elegant personal site and blog built with BlogBuilder.",
+  "theme": "theme/index.html",
+  "collections": {
+    "posts": {
+      "dir": "content/posts",
+      "route": "/blog"
+    }
+  }
+}

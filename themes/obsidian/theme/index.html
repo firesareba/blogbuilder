@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obsidian — a personal site</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Georgia:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+</head>
+<body>
+
+<header data-builder-id="site-header" data-builder-locked="true" class="site-header">
+  <div class="wrap header-row">
+    <span data-builder-id="site-title" class="site-title">Obsidian</span>
+    <nav data-builder-id="site-nav" class="site-nav">
+      <a data-builder-id="nav-home" href="/" class="nav-link">Home</a>
+      <a data-builder-id="nav-blog" href="/#latest-posts" class="nav-link">Writing</a>
+      <a data-builder-id="nav-about" href="/#about-me" class="nav-link">About</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section data-builder-id="hero" class="hero wrap">
+    <svg class="enso" viewBox="0 0 200 200" aria-hidden="true">
+      <path d="M100,24 A76,76 0 1 1 34,146" fill="none" stroke="#3b82f6" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    <div class="hero-copy">
+      <h1 data-builder-id="headline" class="headline">a quiet corner of the internet</h1>
+      <p data-builder-id="hero-subhead" class="hero-subhead">Notes on things I build, break, and eventually understand — written down before I forget them.</p>
+      <div class="hero-actions">
+        <button data-builder-id="hero-cta" class="btn btn-primary">Start reading</button>
+        <button data-builder-id="clickifyouhateschoology" class="btn btn-ghost">click if you hate schoology</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-builder-id="about-me" class="about wrap">
+    <img data-builder-id="profile-image" class="profile-image" src="/assets/profile-placeholder.svg" alt="A simple illustrated avatar">
+    <div class="about-copy">
+      <h2 data-builder-id="about-heading" class="section-heading">About</h2>
+      <p data-builder-id="about-text" class="about-text">I like taking things apart to see how they work, and putting them back together slightly better than before. This site is where the notes end up — half build-log, half diary.</p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section class="posts-section wrap">
+    <h2 data-builder-id="latest-posts-heading" class="section-heading">Latest writing</h2>
+    <div data-builder-id="latest-posts" data-builder-collection="posts" class="post-list"></div>
+  </section>
+
+  <hr class="divider">
+
+  <section class="posts-section wrap">
+    <h2 data-builder-id="archive-heading" class="section-heading">Archive</h2>
+    <div data-builder-id="archive" data-builder-collection="posts" class="post-list post-list-archive"></div>
+  </section>
+
+</main>
+
+<footer data-builder-id="site-footer" data-builder-locked="true" class="site-footer">
+  <div class="wrap footer-row">
+    <span data-builder-id="footer-text" class="footer-text">Built by hand. Hosted on my own hardware.</span>
+  </div>
+</footer>
+
+</body>
+</html>

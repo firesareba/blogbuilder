@@ -47,6 +47,16 @@ app.use("/assets", (req, res, next) => {
   express.static(path.join(currentRepoPath, "assets"))(req, res, next);
 });
 
+// Serve theme files (css, js, etc.) at the root so the preview HTML can
+// link to e.g. "/theme.css" and get the current repo's theme stylesheet.
+app.use((req, res, next) => {
+  const p = path.join(currentRepoPath, "theme", req.path);
+  if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+    return res.sendFile(p);
+  }
+  next();
+});
+
 // Serve the published static output too, for a "view published site" tab.
 app.use("/dist", (req, res, next) => {
   express.static(path.join(currentRepoPath, "dist"))(req, res, next);

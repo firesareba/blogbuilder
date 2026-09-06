@@ -148,15 +148,27 @@
 
   <!-- ===================== SETTINGS TAB ===================== -->
   <section class="panel hidden" id="panel-settings">
-    <div class="settings-panel">
-      <h3>Repository</h3>
-      <p class="muted small" id="repoPathDisplay">…</p>
-      <div class="git-actions">
-        <input id="loadRepoPath" type="text" placeholder="/path/to/another/repo">
-        <button id="loadRepoBtn" class="btn btn-ghost btn-sm">Load repo</button>
-      </div>
+    <div class="settings-scroll">
+      <div class="settings-panel">
+        <h3>Repository</h3>
+        <p class="muted small" id="repoPathDisplay">…</p>
+        <div class="git-actions">
+          <input id="loadRepoPath" type="text" placeholder="/path/to/another/repo" autocomplete="off" spellcheck="false">
+          <button id="loadRepoBtn" class="btn btn-ghost btn-sm">Load repo</button>
+        </div>
 
-      <h3 style="margin-top:28px">AI provider (BYOK)</h3>
+        <h3 style="margin-top:28px">Starter themes</h3>
+        <p class="muted small">Pick a theme as a starting point. This replaces the theme files in your repo and resets overrides.</p>
+        <div id="themeGrid" class="theme-grid"><p class="muted small">Loading themes…</p></div>
+
+        <h3 style="margin-top:28px">Upload custom theme</h3>
+        <p class="muted small">Upload a .zip with <span translate="no">theme/index.html</span> + <span translate="no">theme.css</span> (optionally <span translate="no">post.html</span>).</p>
+        <div class="git-actions">
+          <input id="themeUploadInput" type="file" accept=".zip">
+          <button id="themeUploadBtn" class="btn btn-ghost btn-sm">Upload</button>
+        </div>
+
+        <h3 style="margin-top:28px">AI provider (BYOK)</h3>
       <div class="settings-row">
         <label>Provider</label>
         <select id="aiProvider">
