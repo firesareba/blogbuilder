@@ -24,7 +24,19 @@ function getRepoPath() {
 }
 
 const app = express();
-app.use(helmet());
+// Plain-HTTP meshnet deployment: no TLS at the container. HSTS and
+// upgrade-insecure-requests are disabled so browsers don't force-https
+// (which would break all styling/assets over http). Users are expected
+// to reach this only over a trusted private meshnet (see README).
+app.use(helmet({
+  hsts: false,
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "upgrade-insecure-requests": null,
+    },
+  },
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: "5mb" }));
 
@@ -38,7 +50,7 @@ app.post("/api/login", loginLimiter, (req, res) => {
   const { username, password } = req.body || {};
   if (username === ADMIN_USER && password === ADMIN_PASS) {
     const token = createSession(username);
-    res.cookie("session", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "Strict", maxAge: 24 * 3600 * 1000 });
+    res.cookie("session", token, { httpOnly: true, secure: process.env.COOKIE_SECURE === "1", sameSite: "Lax", maxAge: 24 * 3600 * 1000 });
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: "Invalid credentials" });
