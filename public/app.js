@@ -1003,26 +1003,6 @@ function initSettings() {
     }
   });
 }
-  });
-  document.getElementById("themeUploadBtn").addEventListener("click", async () => {
-    const input = document.getElementById("themeUploadInput");
-    const file = input.files[0];
-    if (!file) return toast("Pick a .zip first", true);
-    const fd = new FormData();
-    fd.append("theme", file);
-    toast("Uploading theme…");
-    try {
-      const res = await fetch("/api/themes/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      toast(`Theme "${data.id}" uploaded and applied`);
-      await loadThemes();
-      await applyTheme(data.id);
-    } catch (e) {
-      toast(e.message, true);
-    }
-  });
-}
 
 // ===========================================================================
 // PUBLISH
