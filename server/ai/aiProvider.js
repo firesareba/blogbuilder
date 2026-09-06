@@ -12,8 +12,9 @@
 
 const anthropic = require("./providers/anthropic");
 const openai = require("./providers/openai");
+const google = require("./providers/google");
 
-const PROVIDERS = { anthropic, openai };
+const PROVIDERS = { anthropic, openai, google };
 
 const OPERATION_SCHEMA_DOC = `
 Valid operations (respond with a JSON array containing ONLY these shapes):
