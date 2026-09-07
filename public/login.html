@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0f19">
+<title>BlogBuilder — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-card { width: 420px; max-width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 28px; box-shadow: var(--shadow-md); }
+  .auth-card h1 { font-size: 22px; margin: 0 0 4px; }
+  .auth-card .sub { margin: 0 0 20px; }
+  .auth-card .field { margin-bottom: 12px; }
+  .auth-card .btn-primary { width: 100%; margin-top: 8px; }
+  .auth-err { color: var(--danger); font-size: 13px; min-height: 20px; margin: 8px 0 0; }
+  .auth-steps { display: flex; gap: 6px; margin-bottom: 20px; }
+  .auth-steps span { flex: 1; height: 4px; border-radius: 2px; background: var(--border); }
+  .auth-steps span.on { background: var(--accent); }
+  .auth-extra { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .auth-extra h3 { font-size: 14px; margin: 0 0 8px; }
+  .device-code { font-size: 28px; font-weight: 700; letter-spacing: 0.1em; text-align: center; padding: 12px; background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius); margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-steps" id="steps" hidden><span class="on"></span><span></span><span></span></div>
+    <h1 id="title">Sign in to BlogBuilder</h1>
+    <p class="muted small sub" id="subtitle">Enter your credentials to continue.</p>
+
+    <!-- step 1: create user (first run) or login -->
+    <div id="stepCreds">
+      <div class="field"><label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" spellcheck="false"></div>
+      <div class="field"><label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="credsBtn">Sign in</button>
+      <p class="auth-err" id="credsErr" aria-live="polite"></p>
+    </div>
+
+    <!-- step 2 (first run only): server AI key + GitHub -->
+    <div id="stepExtras" hidden>
+      <div class="auth-extra">
+        <h3>AI key (BYOK, saved on the server)</h3>
+        <div class="field"><label for="aiProvider">Provider</label>
+          <select id="aiProvider">
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI-compatible</option>
+            <option value="google">Google (Gemini)</option>
+          </select></div>
+        <div class="field"><label for="aiKey">API key (optional — skip for now)</label>
+          <input type="password" id="aiKey" autocomplete="off" spellcheck="false" placeholder="sk-…"></div>
+      </div>
+      <div class="auth-extra">
+        <h3>GitHub (optional — skip for now)</h3>
+        <p class="muted small">Approve in your browser: copy the code, open the link, paste it there.</p>
+        <button class="btn btn-ghost btn-sm" id="ghDeviceBtn">Get device code</button>
+        <div id="ghDeviceBox" hidden>
+          <div class="device-code" id="ghCode">…</div>
+          <p class="muted small">Open <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> and enter the code.</p>
+          <p class="muted small" id="ghStatus" aria-live="polite"></p>
+        </div>
+        <div class="field" style="margin-top:10px"><label for="ghToken">Or paste a token</label>
+          <input type="password" id="ghToken" autocomplete="off" spellcheck="false" placeholder="ghp_… / github_pat_…"></div>
+        <button class="btn btn-ghost btn-sm" id="ghTokenBtn">Connect with token</button>
+        <p class="auth-err" id="ghErr" aria-live="polite"></p>
+      </div>
+      <button class="btn btn-primary" id="finishBtn" style="margin-top:20px">Save &amp; open BlogBuilder</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let isSetup = false, pollTimer = null;
+
+async function boot() {
+  const st = await fetch("/api/auth/status").then((r) => r.json());
+  if (st.loggedIn) { location.href = "/"; return; }
+  isSetup = !!st.setupRequired;
+  if (isSetup) {
+    $("steps").hidden = false;
+    $("title").textContent = "Welcome — create your account";
+    $("subtitle").textContent = "First launch. This user is saved on the server for all future sign-ins.";
+    $("credsBtn").textContent = "Create account & continue";
+    $("username").setAttribute("autocomplete", "username");
+    $("password").setAttribute("autocomplete", "new-password");
+  }
+}
+async function submitCreds() {
+  const u = $("username").value.trim(), p = $("password").value;
+  $("credsErr").textContent = "";
+  if (!u || !p) { $("credsErr").textContent = "Username and password are required."; return; }
+  const url = isSetup ? "/api/auth/setup" : "/api/login";
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: u, password: p }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $("credsErr").textContent = d.error || "Failed"; return; }
+  if (isSetup) {
+    document.querySelectorAll("#steps span")[1].classList.add("on");
+    $("stepCreds").hidden = true;
+    $("stepExtras").hidden = false;
+    $("title").textContent = "Connect services (optional)";
+    $("subtitle").textContent = "Saved on the server. Skip anything — change it later in Settings.";
+  } else {
+    location.href = "/";
+  }
+}
+async function finishExtras() {
+  const key = $("aiKey").value.trim();
+  if (key) {
+    await fetch("/api/auth/ai", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: $("aiProvider").value, apiKey: key }) });
+  }
+  const tok = $("ghToken").value.trim();
+  if (tok) {
+    const r = await fetch("/api/auth/github/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: tok }) });
+    if (!r.ok) { $("ghErr").textContent = (await r.json()).error || "GitHub connect failed"; return; }
+  }
+  location.href = "/";
+}
+async function deviceStart() {
+  $("ghErr").textContent = "";
+  const r = await fetch("/api/auth/github/device/start", { method: "POST" });
+  const d = await r.json();
+  if (!r.ok) { $("ghErr").textContent = d.error || "Could not start device flow"; return; }
+  $("ghDeviceBox").hidden = false;
+  clearInterval(pollTimer);
+  const poll = async () => {
+    const pr = await fetch("/api/auth/github/device/poll").then((x) => x.json());
+    if (pr.code) $("ghCode").textContent = pr.code;
+    if (pr.done) {
+      clearInterval(pollTimer);
+      $("ghStatus").textContent = pr.ok ? ("Connected as " + (pr.user || "GitHub") + " ✓") : ("Failed: " + (pr.error || "unknown"));
+    } else {
+      $("ghStatus").textContent = "Waiting for approval…";
+    }
+  };
+  await poll();
+  pollTimer = setInterval(poll, 5000);
+}
+$("credsBtn").addEventListener("click", submitCreds);
+$("password").addEventListener("keydown", (e) => { if (e.key === "Enter") submitCreds(); });
+$("finishBtn").addEventListener("click", finishExtras);
+$("ghDeviceBtn").addEventListener("click", deviceStart);
+$("ghTokenBtn").addEventListener("click", async () => {
+  const tok = $("ghToken").value.trim();
+  if (!tok) { $("ghErr").textContent = "Paste a token first."; return; }
+  const r = await fetch("/api/auth/github/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: tok }) });
+  const d = await r.json();
+  $("ghErr").textContent = r.ok ? ("Connected as " + (d.user || "GitHub") + " ✓") : (d.error || "Failed");
+});
+boot();
+</script>
+</body>
+</html>

@@ -10,16 +10,14 @@
 
 const { setRemote } = require("./gitLayer");
 
-function remoteUrl(owner, repo, token) {
-  if (token) {
-    return `https://${encodeURIComponent(token)}@github.com/${owner}/${repo}.git`;
-  }
+function remoteUrl(owner, repo) {
   return `https://github.com/${owner}/${repo}.git`;
 }
 
-async function connect(repoPath, { owner, repo, token }) {
+// Auth comes from `gh` (credential helper), never embedded in the URL.
+async function connect(repoPath, { owner, repo }) {
   if (!owner || !repo) throw new Error("owner and repo are required");
-  const url = remoteUrl(owner, repo, token);
+  const url = remoteUrl(owner, repo);
   return setRemote(repoPath, url, "origin");
 }
 

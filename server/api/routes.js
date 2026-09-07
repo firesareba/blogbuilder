@@ -24,16 +24,12 @@ function createRouter({ getRepoPath }) {
   // "load a different repository" flow needs no server restart.
   router.use((req, res, next) => {
     req.repoPath = getRepoPath();
-    if (req.method !== "GET" && !req.path.startsWith("/health") && !req.path.startsWith("/login") && req.path !== "/themes" && req.path !== "/site") {
-      const { verifySession } = require("../middleware/auth");
-      const token = req.headers.cookie && req.headers.cookie.split(";").find(c => c.trim().startsWith("session="));
-      // ponytail: cookie parsing minimal, revisit with proper middleware
-      const val = token ? token.split("=")[1] : null;
-      const user = val ? verifySession(decodeURIComponent(val)) : null;
-      if (!user && process.env.ADMIN_PASS) {
-        // auth enforced only when ADMIN_PASS is set
-        return res.status(401).json({ error: "Authentication required" });
-      }
+    // Reads stay open (preview, CLI, published output); every mutation
+    // needs a signed session cookie. Auth endpoints live in index.js.
+    const open = req.method === "GET";
+    if (!open) {
+      const { getSessionUser } = require("../middleware/auth");
+      if (!getSessionUser(req)) return res.status(401).json({ error: "Authentication required" });
     }
     next();
   });
@@ -208,7 +204,15 @@ function createRouter({ getRepoPath }) {
 
   // -- AI copilot ---------------------------------------------------------
   router.post("/ai/operations", wrap(async (req) => {
-    const body = validate(aiOpsSchema, req.body);
+    const { getServerApiKey, getServerAI } = require("../middleware/auth");
+    const srv = getServerAI();
+    const merged = {
+      provider: req.body?.provider || srv.provider || undefined,
+      apiKey: req.body?.apiKey || getServerApiKey() || undefined,
+      model: req.body?.model || srv.model || undefined,
+      instruction: req.body?.instruction,
+    };
+    const body = validate(aiOpsSchema, merged);
     const elements = engine.getElements(req.repoPath);
     const ops = await ai.generateOperations({ ...body, elements });
     return { operations: ops };
@@ -224,7 +228,16 @@ function createRouter({ getRepoPath }) {
     });
     return { results };
   }));
-  router.post("/ai/article-assist", wrap((req) => ai.articleAssist(req.body)));
+  router.post("/ai/article-assist", wrap((req) => {
+    const { getServerApiKey, getServerAI } = require("../middleware/auth");
+    const srv = getServerAI();
+    return ai.articleAssist({
+      ...req.body,
+      provider: req.body?.provider || srv.provider || undefined,
+      apiKey: req.body?.apiKey || getServerApiKey() || undefined,
+      model: req.body?.model || srv.model || undefined,
+    });
+  }));
 
   // -- markdown <-> html (used by the rich text editor for loading content) --
   router.post("/markdown/to-html", wrap((req) => {

@@ -40,6 +40,20 @@ your-site/
   assets/
 ```
 
-## Auth
+## Auth (first run)
 
-Set `ADMIN_USER`/`ADMIN_PASS` — mutating API routes return 401 without the signed session cookie. Login via `POST /api/login`.
+No user exists on first launch — opening `/` shows a **create-account screen**.
+Submitting saves `ADMIN_USER` + scrypt-hashed password to `AUTH_ENV`
+(`/data/auth.env` in Docker, survives rebuilds) for all future sign-ins.
+Sign-in afterwards is username + password with a signed `HttpOnly` session cookie.
+
+The same setup screen (and later Settings / Git tab) covers:
+- **GitHub**: approve via browser device code (`gh auth login --web`) or paste
+  a token once. Auth lives in the `gh` CLI credential helper (`/data/gh`) —
+  no token is ever embedded in git config. Pre-seed via env if you prefer.
+- **AI key (BYOK)**: optionally saved server-side to the same env file and
+  used when the browser has no key set. Browser key still wins when present.
+
+Env overrides (optional, checked before the env file): `ADMIN_USER`,
+`ADMIN_PASS` (plaintext, legacy), `ADMIN_PASS_HASH`, `AI_PROVIDER`,
+`AI_MODEL`, `AI_API_KEY`, `SESSION_SECRET`, `COOKIE_SECURE=1` (HTTPS only).

@@ -10,6 +10,7 @@ async function api(method, path, body) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { location.href = "/"; throw new Error("Signed out - please sign in"); }
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
@@ -593,7 +594,6 @@ function insertLink() {
 }
 
 async function runArticleAssist(action, editable, titleInput) {
-  if (!Settings.apiKey) return toast("Add your AI API key in Settings first", true);
   const selection = window.getSelection();
   const selectedText = selection && !selection.isCollapsed && editable.contains(selection.anchorNode)
     ? selection.toString() : "";
@@ -798,16 +798,59 @@ function initGit() {
     } catch (e) { toast(e.message, true); }
   });
   document.getElementById("ghConnectBtn").addEventListener("click", async () => {
-    const owner = document.getElementById("ghOwner").value;
-    const repo = document.getElementById("ghRepo").value;
-    const token = document.getElementById("ghToken").value;
+    const owner = document.getElementById("ghOwner").value.trim();
+    const repo = document.getElementById("ghRepo").value.trim();
+    if (!owner || !repo) return toast("Owner and repo are required", true);
     try {
-      const check = await api("POST", "/github/verify", { owner, repo, token });
-      if (!check.ok) return toast(`Couldn't verify repo/token (status ${check.status})`, true);
-      await api("POST", "/github/connect", { owner, repo, token });
-      toast(`Connected to ${check.fullName}`);
+      await api("POST", "/github/connect", { owner, repo });
+      toast(`Remote set to ${owner}/${repo} (auth via gh CLI)`);
     } catch (e) { toast(e.message, true); }
   });
+  refreshGhStatus();
+  let ghPoll = null;
+  document.getElementById("ghDeviceBtn").addEventListener("click", async () => {
+    try {
+      const r = await fetch("/api/auth/github/device/start", { method: "POST" }).then((x) => x.json());
+      const msg = document.getElementById("ghDeviceMsg");
+      clearInterval(ghPoll);
+      const poll = async () => {
+        const pr = await fetch("/api/auth/github/device/poll").then((x) => x.json());
+        if (pr.code) msg.innerHTML = `Code: <b>${escapeHtml(pr.code)}</b> — enter it at <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a>`;
+        if (pr.done) { clearInterval(ghPoll); msg.textContent = pr.ok ? `Connected as ${pr.user} ✓` : `Failed: ${pr.error || "unknown"}`; refreshGhStatus(); }
+        else if (!pr.code) msg.textContent = "Starting device flow…";
+      };
+      await poll();
+      ghPoll = setInterval(poll, 5000);
+    } catch (e) { toast(e.message, true); }
+  });
+  document.getElementById("ghTokenBtn").addEventListener("click", async () => {
+    const token = document.getElementById("ghToken").value.trim();
+    if (!token) return toast("Paste a token first", true);
+    try {
+      const r = await fetch("/api/auth/github/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) }).then((x) => x.json());
+      if (r.error || r.ok === false) throw new Error(r.error || "Failed");
+      toast(`GitHub connected as ${r.user || "gh"} ✓`);
+      document.getElementById("ghToken").value = "";
+      refreshGhStatus();
+    } catch (e) { toast(e.message, true); }
+  });
+}
+async function refreshServerAiStatus() {
+  try {
+    const st = await fetch("/api/auth/ai").then((r) => r.json());
+    document.getElementById("serverAiStatus").textContent =
+      st.provider ? `Server: ${st.provider}${st.hasKey ? " + key ✓" : " (no key)"}` : "Server: no key saved";
+  } catch {
+    document.getElementById("serverAiStatus").textContent = "";
+  }
+}
+async function refreshGhStatus() {
+  try {
+    const st = await fetch("/api/auth/github/status").then((r) => r.json());
+    document.getElementById("ghStatusLine").textContent = st.loggedIn ? `Signed in as ${st.user} ✓` : "Not signed in to GitHub";
+  } catch {
+    document.getElementById("ghStatusLine").textContent = "GitHub status unavailable";
+  }
 }
 
 // ===========================================================================
@@ -816,7 +859,6 @@ function initGit() {
 let pendingOps = [];
 function initAiPanel() {
   document.getElementById("aiAskBtn").addEventListener("click", async () => {
-    if (!Settings.apiKey) return toast("Add your AI API key in Settings first", true);
     const instruction = document.getElementById("aiInstruction").value.trim();
     if (!instruction) return;
     document.getElementById("aiResult").textContent = "Thinking…";
@@ -892,6 +934,10 @@ function loadSettingsIntoForm() {
   document.getElementById("aiApiKey").value = Settings.apiKey;
   api("GET", "/site").then((s) => {
     document.getElementById("repoPathDisplay").textContent = `${s.repoPath} · ${s.postCount} posts (${s.publishedCount} published)`;
+  }).catch(() => {});
+  fetch("/api/auth/ai").then((r) => r.json()).then((st) => {
+    if (st.provider && !localStorage.getItem("bb_ai_provider")) document.getElementById("aiProvider").value = st.provider;
+    if (st.model && !localStorage.getItem("bb_ai_model")) document.getElementById("aiModel").value = st.model;
   }).catch(() => {});
   loadThemes();
 }
@@ -1002,6 +1048,26 @@ function initSettings() {
       toast(e.message, true);
     }
   });
+  document.getElementById("saveServerAiBtn").addEventListener("click", async () => {
+    try {
+      const r = await fetch("/api/auth/ai", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: document.getElementById("aiProvider").value,
+          model: document.getElementById("aiModel").value,
+          apiKey: document.getElementById("aiApiKey").value,
+        }),
+      }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      toast("Server AI key saved");
+      refreshServerAiStatus();
+    } catch (e) { toast(e.message, true); }
+  });
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await fetch("/api/logout", { method: "POST" });
+    location.href = "/";
+  });
+  refreshServerAiStatus();
 }
 
 // ===========================================================================

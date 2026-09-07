@@ -10,7 +10,8 @@ const rateLimit = require("express-rate-limit");
 const pino = require("pino")();
 
 const { createRouter } = require("./api/routes");
-const { createSession, authRequired, ADMIN_USER, ADMIN_PASS } = require("./middleware/auth");
+const auth = require("./middleware/auth");
+const ghAuth = require("./git/ghAuth");
 
 const PORT = process.env.PORT || 4321;
 const DEFAULT_REPO = path.resolve(
@@ -46,11 +47,47 @@ const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeader
 
 app.use(generalLimiter);
 
-app.post("/api/login", loginLimiter, (req, res) => {
+function sessionCookie(res, username) {
+  const token = auth.createSession(username);
+  res.cookie("session", token, { httpOnly: true, secure: process.env.COOKIE_SECURE === "1", sameSite: "Lax", maxAge: 24 * 3600 * 1000 });
+}
+
+app.get("/api/auth/status", async (req, res) => {
+  const user = auth.getSessionUser(req);
+  const gh = await ghAuth.ghStatus().catch(() => ({ loggedIn: false }));
+  res.json({
+    setupRequired: auth.isSetupRequired(),
+    loggedIn: !!user,
+    user: user ? user.username : null,
+    github: gh.loggedIn ? { user: gh.user } : null,
+    ai: auth.getServerAI(),
+  });
+});
+
+// First-run only: create the user. Credentials persist to AUTH_ENV.
+app.post("/api/auth/setup", loginLimiter, (req, res) => {
+  if (!auth.isSetupRequired()) return res.status(400).json({ error: "Setup already complete" });
   const { username, password } = req.body || {};
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    const token = createSession(username);
-    res.cookie("session", token, { httpOnly: true, secure: process.env.COOKIE_SECURE === "1", sameSite: "Lax", maxAge: 24 * 3600 * 1000 });
+  try {
+    auth.saveCredentials(username, password);
+    sessionCookie(res, username);
+    pino.info("First-run setup complete");
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+app.post("/api/login", loginLimiter, (req, res) => {
+  const cfg = auth.getConfiguredUser();
+  if (!cfg) return res.status(400).json({ error: "No user yet - complete setup first" });
+  const { username, password } = req.body || {};
+  const okUser = username === cfg.username;
+  const okPass = cfg.passHash
+    ? auth.checkPassword(password || "", cfg.passHash)
+    : password === cfg.passPlain;
+  if (okUser && okPass) {
+    sessionCookie(res, username);
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: "Invalid credentials" });
@@ -59,6 +96,37 @@ app.post("/api/login", loginLimiter, (req, res) => {
 app.post("/api/logout", (req, res) => {
   res.clearCookie("session");
   res.json({ ok: true });
+});
+
+// Server-side AI key (BYOK persisted to AUTH_ENV). Auth required.
+app.get("/api/auth/ai", auth.authRequired, (req, res) => res.json(auth.getServerAI()));
+app.post("/api/auth/ai", auth.authRequired, (req, res) => {
+  const { provider, model, apiKey } = req.body || {};
+  auth.saveServerAI({ provider, model, apiKey });
+  res.json({ ok: true, ...auth.getServerAI() });
+});
+
+// GitHub via gh CLI. Auth required (except status, which is harmless).
+app.get("/api/auth/github/status", async (req, res) => {
+  res.json(await ghAuth.ghStatus().catch((e) => ({ loggedIn: false, output: e.message })));
+});
+app.post("/api/auth/github/token", auth.authRequired, async (req, res) => {
+  try {
+    const st = await ghAuth.loginWithToken((req.body || {}).token);
+    res.json({ ok: true, ...st });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.post("/api/auth/github/device/start", auth.authRequired, (req, res) => {
+  try {
+    res.json({ ok: true, ...ghAuth.startDeviceFlow() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+app.get("/api/auth/github/device/poll", auth.authRequired, async (req, res) => {
+  res.json(await ghAuth.pollDeviceFlow());
 });
 
 app.get("/health", (req, res) => {
@@ -110,7 +178,14 @@ app.use("/dist", (req, res, next) => {
   express.static(path.join(currentRepoPath, "dist"))(req, res, next);
 });
 
-// The builder GUI itself.
+// The builder GUI itself. Unauthenticated visitors get the login /
+// first-run setup screen instead of the app.
+app.get("/", (req, res, next) => {
+  if (!auth.getSessionUser(req)) {
+    return res.sendFile(path.join(__dirname, "..", "public", "login.html"));
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 const server = app.listen(PORT, () => {

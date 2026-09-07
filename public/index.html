@@ -114,15 +114,22 @@
             <button id="pushBtn" class="btn btn-primary btn-sm">Push</button>
             <button id="pullBtn" class="btn btn-ghost btn-sm">Pull</button>
           </div>
-          <h3 style="margin-top:24px">GitHub token (optional)</h3>
-          <p class="muted small">Used only to build an authenticated remote URL for push. Stored in your browser, not on the server.</p>
+          <h3 style="margin-top:24px">Connect repository</h3>
+          <p class="muted small">Owner + repo set a plain remote URL. Auth comes from the <span translate="no">gh</span> CLI credential helper — no token is ever embedded in git config.</p>
           <div class="git-actions">
-            <input id="ghOwner" type="text" placeholder="owner">
-            <input id="ghRepo" type="text" placeholder="repo">
-          </div>
-          <div class="git-actions">
-            <input id="ghToken" type="password" placeholder="Personal access token">
+            <input id="ghOwner" type="text" placeholder="owner" autocomplete="off" spellcheck="false">
+            <input id="ghRepo" type="text" placeholder="repo" autocomplete="off" spellcheck="false">
             <button id="ghConnectBtn" class="btn btn-ghost btn-sm">Connect</button>
+          </div>
+          <h3 style="margin-top:24px">GitHub auth (<span translate="no">gh</span> CLI)</h3>
+          <p class="muted small" id="ghStatusLine">Checking…</p>
+          <div class="git-actions">
+            <button id="ghDeviceBtn" class="btn btn-ghost btn-sm">Approve in browser</button>
+          </div>
+          <p class="muted small" id="ghDeviceMsg"></p>
+          <div class="git-actions">
+            <input id="ghToken" type="password" placeholder="Or paste a token" autocomplete="off">
+            <button id="ghTokenBtn" class="btn btn-ghost btn-sm">Use token</button>
           </div>
         </div>
         <div class="git-col">
@@ -136,7 +143,7 @@
   <!-- ===================== AI TAB ===================== -->
   <section class="panel hidden" id="panel-ai">
     <div class="ai-panel">
-      <p class="muted small">BYOK: paste your own API key in Settings first. Keys stay in your browser and are sent per-request, never stored server-side.</p>
+      <p class="muted small">BYOK: save a key on the server in Settings, or keep one in this browser. Browser key wins when both exist.</p>
       <textarea id="aiInstruction" class="ai-textarea" placeholder='e.g. "Change the headline to something punchier" or "Add a new button next to the hero CTA that links to /contact"'></textarea>
       <div class="ai-actions">
         <button id="aiAskBtn" class="btn btn-primary btn-sm">Ask AI</button>
@@ -185,8 +192,17 @@
         <label>API key</label>
         <input id="aiApiKey" type="password" placeholder="sk-...">
       </div>
-      <button id="saveSettingsBtn" class="btn btn-primary btn-sm">Save settings</button>
-      <p class="muted small">Your API key is stored only in this browser's local storage and sent directly with each AI request. The server never persists it.</p>
+      <button id="saveSettingsBtn" class="btn btn-primary btn-sm">Save in this browser</button>
+      <p class="muted small">Browser key: stored only in this browser's local storage. Takes precedence when set.</p>
+      <div class="git-actions" style="margin-top:10px">
+        <button id="saveServerAiBtn" class="btn btn-ghost btn-sm">Save key on server</button>
+        <span class="muted small" id="serverAiStatus"></span>
+      </div>
+      <p class="muted small">Server key: persisted in the server env file, used when no browser key is set.</p>
+      <h3 style="margin-top:28px">Sign out</h3>
+      <div class="git-actions">
+        <button id="logoutBtn" class="btn btn-ghost btn-sm">Sign out</button>
+      </div>
 </div>
    </section>
 
