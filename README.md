@@ -56,7 +56,7 @@ Env overrides (optional, checked before the env file): `ADMIN_USER`,
 `ADMIN_PASS` (plaintext, legacy), `ADMIN_PASS_HASH`, `AI_PROVIDER`,
 `AI_MODEL`, `AI_API_KEY`, `SESSION_SECRET`, `COOKIE_SECURE=1` (HTTPS only).
 
-#Photos
+# Photos
 <img width="2314" height="1119" alt="Screenshot 2026-09-06 at 10 58 35 PM" src="https://github.com/user-attachments/assets/563718e9-0185-49ee-8fc0-ccc0587679ba" />
 <img width="1755" height="981" alt="Screenshot 2026-09-06 at 10 59 07 PM" src="https://github.com/user-attachments/assets/007234aa-40cf-43a4-806b-fe9cdbf836fd" />
 <img width="1573" height="1247" alt="Screenshot 2026-09-06 at 11 00 15 PM" src="https://github.com/user-attachments/assets/49179aa9-5946-48c1-a183-881f0fb163c2" />
