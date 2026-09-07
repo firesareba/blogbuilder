@@ -40,6 +40,7 @@ function ghStatus() {
 }
 
 async function loginWithToken(token) {
+  token = String(token || "").trim();
   if (!token) throw new Error("token is required");
   const child = spawn("gh", ["auth", "login", "--with-token"], { env: GH_ENV });
   const done = new Promise((resolve) => {

@@ -195,6 +195,9 @@ app.use("/dist", (req, res, next) => {
 // The builder GUI itself. Unauthenticated visitors get the login /
 // first-run setup screen instead of the app.
 app.get("/", (req, res, next) => {
+  // Entry HTML must never cache: otherwise clients keep stale UI (missing
+  // buttons) after deploys and report fixes as "didn't work".
+  res.set("Cache-Control", "no-store");
   if (!auth.getSessionUser(req)) {
     return res.sendFile(path.join(__dirname, "..", "public", "login.html"));
   }
