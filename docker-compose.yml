@@ -9,9 +9,12 @@ services:
       - PORT=4321
       - BLOG_REPO_PATH=/data/site
     volumes:
-      # your actual site repo lives here, on the host - this is the thing
-      # you'd git clone/push independently of the container itself.
-      - ./data/site:/data/site
+      # Persisted container state (all host-owned, readable by uid 1000):
+      #   site/     - your actual site repo (git clone/push this independently)
+      #   auth.env  - first-run user credentials + server AI keys (chmod 600)
+      #   gh/       - `gh` CLI auth (credential helper, no PATs in git config)
+      #   .gitconfig- safe.directory + gh credential-helper wiring
+      - ./data:/data
     mem_limit: 512m
     cpus: 1.0
     read_only: false
