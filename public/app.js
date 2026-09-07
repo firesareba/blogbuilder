@@ -909,6 +909,13 @@ function initGit() {
       toast("Repo is now public — enable Pages on /docs ✓");
     } catch (e) { toast(e.message, true); }
   });
+  document.getElementById("ghPagesBtn").addEventListener("click", async () => {
+    try {
+      const r = await fetch("/api/auth/github/pages", { method: "POST" }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      toast(`Pages now serves /docs on ${r.branch} — live in a minute or two ✓`);
+    } catch (e) { toast(e.message, true); }
+  });
   document.getElementById("ghLogoutBtn").addEventListener("click", async () => {
     if (!confirm("Clear the saved GitHub credential from this server?")) return;
     try {

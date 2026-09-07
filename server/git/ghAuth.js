@@ -222,6 +222,24 @@ function setRepoVisibility(owner, repo, visibility) {
   });
 }
 
+function setPagesSource(owner, repo, branch, scmPath) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ source: { branch, path: scmPath } });
+    const child = require("child_process").spawn("gh",
+      ["api", `repos/${owner}/${repo}/pages`, "--method", "PUT", "--input", "-"],
+      { env: GH_ENV });
+    let errOut = "";
+    child.stderr.on("data", (d) => (errOut += d.toString()));
+    child.on("close", (code) => {
+      if (code !== 0) return resolve({ ok: false, error: errOut.trim() || `exit ${code}` });
+      resolve({ ok: true });
+    });
+    child.on("error", (e) => resolve({ ok: false, error: e.message }));
+    child.stdin.write(body);
+    child.stdin.end();
+  });
+}
+
 function createRepo({ name, description, isPrivate }) {
   if (!name || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(name) && !/^[A-Za-z0-9_.-]+$/.test(name)) {
     return Promise.resolve({ ok: false, error: "Repo name must be 'name' or 'owner/name'" });
@@ -244,4 +262,4 @@ function createRepo({ name, description, isPrivate }) {
   });
 }
 
-module.exports = { runGh, ghStatus, loginWithToken, logout, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, setRepoVisibility, GH_ENV };
+module.exports = { runGh, ghStatus, loginWithToken, logout, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, setRepoVisibility, setPagesSource, GH_ENV };

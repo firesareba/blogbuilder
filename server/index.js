@@ -140,6 +140,23 @@ app.get("/api/auth/github/repos", auth.authRequired, async (req, res) => {
 // Flip visibility of the CONNECTED blog repo (owner/repo taken from the
 // git remote, never from client input - making the wrong repo public
 // would be a nasty surprise). Needed because free Pages requires public.
+// Point GitHub Pages at /docs on the connected repo's default branch.
+app.post("/api/auth/github/pages", auth.authRequired, async (req, res) => {
+  try {
+    const simpleGit = require("simple-git");
+    const remotes = await simpleGit(getRepoPath()).getRemotes(true);
+    const origin = (remotes.find((r) => r.name === "origin")?.refs?.fetch || "");
+    const m = origin.match(/github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/);
+    if (!m) return res.status(400).json({ error: "origin is not a GitHub remote" });
+    const info = await ghAuth.runGh(["api", `repos/${m[1]}/${m[2]}`, "--jq", ".default_branch"]);
+    const branch = (info.ok && info.output) || "main";
+    const r = await ghAuth.setPagesSource(m[1], m[2], branch, "/docs");
+    if (!r.ok) return res.status(400).json(r);
+    res.json({ ok: true, branch, path: "/docs" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 app.post("/api/auth/github/visibility", auth.authRequired, async (req, res) => {
   try {
     const simpleGit = require("simple-git");
