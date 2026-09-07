@@ -28,6 +28,21 @@ function loadConfig(repoPath) {
   return JSON.parse(fs.readFileSync(p, "utf8"));
 }
 
+// Only whitelisted keys are writable - theme paths and collection dirs
+// stay file-edited to avoid bricking the repo from the UI.
+function updateConfig(repoPath, patch) {
+  const allowed = ["title", "description"];
+  const config = loadConfig(repoPath);
+  for (const k of allowed) {
+    if (patch[k] !== undefined) config[k] = patch[k];
+  }
+  atomicWriteFileSync(
+    path.join(repoPath, "content", "config.json"),
+    JSON.stringify(config, null, 2) + "\n"
+  );
+  return config;
+}
+
 function loadOverrides(repoPath) {
   const p = path.join(repoPath, "content", "overrides.json");
   if (!fs.existsSync(p)) return structuredClone(DEFAULT_OVERRIDES);
@@ -199,6 +214,7 @@ function loadSite(repoPath) {
 module.exports = {
   loadSite,
   loadConfig,
+  updateConfig,
   loadOverrides,
   saveOverrides,
   loadPosts,

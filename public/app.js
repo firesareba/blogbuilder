@@ -1033,6 +1033,8 @@ function loadSettingsIntoForm() {
   document.getElementById("aiApiKey").value = Settings.apiKey;
   api("GET", "/site").then((s) => {
     document.getElementById("repoPathDisplay").textContent = `${s.repoPath} · ${s.postCount} posts (${s.publishedCount} published)`;
+    document.getElementById("siteTitleInput").value = (s.config && s.config.title) || "";
+    document.getElementById("siteDescInput").value = (s.config && s.config.description) || "";
   }).catch(() => {});
   fetch("/api/auth/ai").then((r) => r.json()).then((st) => {
     if (st.provider && !localStorage.getItem("bb_ai_provider")) document.getElementById("aiProvider").value = st.provider;
@@ -1163,6 +1165,16 @@ function initSettings() {
       if (r.error) throw new Error(r.error);
       toast("Server AI key saved");
       refreshServerAiStatus();
+    } catch (e) { toast(e.message, true); }
+  });
+  document.getElementById("saveSiteBtn").addEventListener("click", async () => {
+    const title = document.getElementById("siteTitleInput").value.trim();
+    const description = document.getElementById("siteDescInput").value.trim();
+    if (!title) return toast("Title can't be empty", true);
+    try {
+      await api("PUT", "/site", { title, description });
+      toast("Site title saved");
+      reloadCanvas();
     } catch (e) { toast(e.message, true); }
   });
   document.getElementById("logoutBtn").addEventListener("click", async () => {

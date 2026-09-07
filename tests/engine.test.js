@@ -69,6 +69,21 @@ describe("aiProvider", () => {
   });
 });
 
+describe("site title", () => {
+  it("updateConfig writes title and renderer uses it for <title>", () => {
+    const { updateConfig, loadConfig } = require("../server/engine/siteModel");
+    const { renderPage, publishSite } = require("../server/engine/renderer");
+    const { loadSite } = require("../server/engine/siteModel");
+    updateConfig(repo, { title: "Tab Title", description: "Tagline here" });
+    assert.equal(loadConfig(repo).title, "Tab Title");
+    const site = loadSite(repo);
+    assert.ok(renderPage(site.theme.html, site).includes("<title>Tab Title</title>"));
+    const r = publishSite(repo);
+    const html = require("fs").readFileSync(require("path").join(r.outDir, "index.html"), "utf8");
+    assert.ok(html.includes("<title>Tab Title</title>"));
+  });
+});
+
 describe("renderer", () => {
   it("publishes homepage + post pages", () => {
     content.createPost(repo, { title: "P1" });

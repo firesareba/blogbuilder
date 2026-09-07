@@ -166,7 +166,20 @@
   <section class="panel hidden" id="panel-settings">
     <div class="settings-scroll">
       <div class="settings-panel">
-        <h3>Repository</h3>
+        <h3>Site</h3>
+        <div class="settings-row">
+          <label for="siteTitleInput">Tab title</label>
+          <input id="siteTitleInput" type="text" maxlength="200" placeholder="My blog" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="settings-row">
+          <label for="siteDescInput">Tagline</label>
+          <input id="siteDescInput" type="text" maxlength="500" placeholder="What this site is about" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="git-actions">
+          <button id="saveSiteBtn" class="btn btn-primary btn-sm">Save title</button>
+        </div>
+        <p class="muted small">Shown in the browser tab. (The big header text on the page itself is a separate element — edit it in the builder.)</p>
+        <h3 style="margin-top:28px">Repository</h3>
         <p class="muted small" id="repoPathDisplay">…</p>
         <div class="git-actions">
           <input id="loadRepoPath" type="text" placeholder="/path/to/another/repo" autocomplete="off" spellcheck="false">

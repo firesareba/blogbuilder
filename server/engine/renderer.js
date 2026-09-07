@@ -120,6 +120,26 @@ function renderPage(themeHtml, site) {
   const dom = new JSDOM(themeHtml);
   const doc = dom.window.document;
   applyModelToDom(doc, site);
+  // config.json is the source of truth for the tab title, not whatever the
+  // theme hardcoded - otherwise editing the title in Settings visibly
+  // does nothing.
+  if (site.config.title) {
+    let titleEl = doc.querySelector("title");
+    if (!titleEl) {
+      titleEl = doc.createElement("title");
+      doc.head.appendChild(titleEl);
+    }
+    titleEl.textContent = site.config.title;
+  }
+  if (site.config.description) {
+    let meta = doc.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = doc.createElement("meta");
+      meta.setAttribute("name", "description");
+      doc.head.appendChild(meta);
+    }
+    meta.setAttribute("content", site.config.description);
+  }
   return `<!DOCTYPE html>\n${dom.serialize().replace(/^<!DOCTYPE html>\n?/i, "")}`;
 }
 

@@ -129,6 +129,14 @@ function createRouter({ getRepoPath }) {
       publishedCount: site.posts.filter((p) => p.published).length,
     };
   }));
+  const siteUpdateSchema = z.object({
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().max(500).optional(),
+  });
+  router.put("/site", wrap((req) => {
+    const { updateConfig } = require("../engine/siteModel");
+    return { config: updateConfig(req.repoPath, validate(siteUpdateSchema, req.body)) };
+  }));
 
   // -- elements -------------------------------------------------------------
   router.get("/elements", wrap((req) => engine.getElements(req.repoPath)));
