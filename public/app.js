@@ -812,6 +812,8 @@ function initGit() {
     try {
       const r = await fetch("/api/auth/github/device/start", { method: "POST" }).then((x) => x.json());
       const msg = document.getElementById("ghDeviceMsg");
+      if (r.alreadyIn) { msg.textContent = `Already connected as ${r.alreadyIn} ✓`; refreshGhStatus(); return; }
+      if (r.error || !r.ok) throw new Error(r.error || "Could not start device flow");
       clearInterval(ghPoll);
       const poll = async () => {
         const pr = await fetch("/api/auth/github/device/poll").then((x) => x.json());

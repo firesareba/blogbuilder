@@ -68,9 +68,18 @@ function setupGit() {
 // --- device flow (single active flow per server) ---
 let activeFlow = null;
 
-function startDeviceFlow() {
+async function startDeviceFlow() {
   if (activeFlow && !activeFlow.done) return activeFlow.public;
-  const child = spawn("gh", ["auth", "login", "--web"], { env: { ...GH_ENV, BROWSER: "true" } });
+  // Already authed? Skip the flow entirely.
+  const already = await ghStatus().catch(() => ({ loggedIn: false }));
+  if (already.loggedIn) {
+    return { url: "https://github.com/login/device", code: null, alreadyIn: already.user };
+  }
+  // --hostname skips the account prompt. The remaining prompts (protocol,
+  // git-credential setup, "press Enter to open browser") have sane defaults,
+  // which we accept by feeding newlines: with no TTY, gh would otherwise
+  // block on stdin forever and the UI spins on "…" indefinitely.
+  const child = spawn("gh", ["auth", "login", "--web", "--hostname", "github.com"], { env: { ...GH_ENV, BROWSER: "true" } });
   const flow = {
     done: false, ok: false, code: null, url: "https://github.com/login/device",
     output: "", error: null, startedAt: Date.now(),
@@ -78,10 +87,23 @@ function startDeviceFlow() {
   activeFlow = flow;
   flow.public = { url: flow.url, code: null, startedAt: flow.startedAt };
 
-  const timer = setTimeout(() => {
-    if (!flow.done) { flow.done = true; flow.error = "Timed out waiting for approval"; try { child.kill(); } catch {} }
+  const feed = setInterval(() => {
+    if (flow.done || flow.code) { clearInterval(feed); return; }
+    try { child.stdin.write("\n"); } catch { clearInterval(feed); }
+  }, 400);
+  // No code within 30s = prompts didn't resolve; fail loudly, never hang.
+  const codeTimer = setTimeout(() => {
+    if (!flow.code && !flow.done) {
+      flow.done = true;
+      flow.error = "No device code from gh after 30s. Output: " + (flow.output.trim().slice(-500) || "(none)");
+      try { child.kill(); } catch {}
+    }
+  }, 30000);
+  if (codeTimer.unref) codeTimer.unref();
+  const pollTimer = setTimeout(() => {
+    if (!flow.done) { flow.done = true; flow.error = "Timed out waiting for browser approval (10 min)"; try { child.kill(); } catch {} }
   }, 10 * 60 * 1000);
-  if (timer.unref) timer.unref();
+  if (pollTimer.unref) pollTimer.unref();
 
   child.stdout.on("data", (d) => {
     flow.output += d.toString();
@@ -89,12 +111,13 @@ function startDeviceFlow() {
     if (m && !flow.code) {
       flow.code = m[1].trim();
       flow.public.code = flow.code;
+      clearInterval(feed);
       try { child.stdin.write("\n"); } catch {}
     }
   });
   child.stderr.on("data", (d) => { flow.output += d.toString(); });
   child.on("close", async (exitCode) => {
-    clearTimeout(timer);
+    clearTimeout(pollTimer); clearTimeout(codeTimer); clearInterval(feed);
     if (exitCode === 0) {
       try {
         await setupGit();

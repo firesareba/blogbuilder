@@ -50,6 +50,7 @@ async function deviceStart() {
   const r = await fetch("/api/auth/github/device/start", { method: "POST" });
   const d = await r.json();
   if (!r.ok) { $("ghErr").textContent = d.error || "Could not start device flow"; return; }
+  if (d.alreadyIn) { $("ghErr").textContent = ""; $("ghStatus").textContent = "Already connected as " + d.alreadyIn + " ✓"; return; }
   $("ghDeviceBox").hidden = false;
   clearInterval(pollTimer);
   const poll = async () => {

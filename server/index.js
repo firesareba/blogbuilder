@@ -118,9 +118,9 @@ app.post("/api/auth/github/token", auth.authRequired, async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
-app.post("/api/auth/github/device/start", auth.authRequired, (req, res) => {
+app.post("/api/auth/github/device/start", auth.authRequired, async (req, res) => {
   try {
-    res.json({ ok: true, ...ghAuth.startDeviceFlow() });
+    res.json({ ok: true, ...(await ghAuth.startDeviceFlow()) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
