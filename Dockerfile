@@ -15,6 +15,7 @@ ENV BLOG_REPO_PATH=/data/site
 ENV HOME=/data
 ENV GH_CONFIG_DIR=/data/gh
 ENV AUTH_ENV=/data/auth.env
+ENV GIT_CONFIG_GLOBAL=/data/.gitconfig
 
 # The repo BlogBuilder edits lives in a volume so it survives container
 # restarts/rebuilds. Seed it from the bundled example-site on first boot.

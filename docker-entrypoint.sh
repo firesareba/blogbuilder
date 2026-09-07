@@ -13,6 +13,9 @@ export AUTH_ENV="${AUTH_ENV:-/data/auth.env}"
 # (which stayed missing) - leaving git with no credential helper and every
 # push failing with "could not read Username".
 export HOME=/data
+# Pin the global gitconfig to the persisted volume: su-exec resets HOME to
+# /home/node, so bare `git config --global` lands somewhere ephemeral.
+export GIT_CONFIG_GLOBAL=/data/.gitconfig
 
 mkdir -p "$BLOG_REPO_PATH" /data/site /data/gh
 touch "$AUTH_ENV" 2>/dev/null || true
@@ -24,6 +27,13 @@ fi
 
 chown -R node:node /data /app/uploads 2>/dev/null || true
 chmod 600 "$AUTH_ENV" 2>/dev/null || true
+
+# Adopt config written before the GIT_CONFIG_GLOBAL fix (it went to the
+# ephemeral /home/node/.gitconfig instead of the volume).
+if [ ! -f /data/.gitconfig ] && [ -f /home/node/.gitconfig ]; then
+  cp /home/node/.gitconfig /data/.gitconfig
+  chown node:node /data/.gitconfig
+fi
 
 # Git refuses repos owned by another uid ("dubious ownership") - the volume
 # is root-owned on the host, so mark it safe for the node user.
