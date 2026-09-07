@@ -81,7 +81,7 @@ function applyModelToDom(doc, site) {
     if (node.visible === false) {
       el.style.display = "none";
     }
-    if (node.kind === "text" && node.text !== undefined) {
+    if ((node.kind === "text" || node.kind === "link") && node.text !== undefined) {
       el.textContent = node.text;
     }
     if (node.kind === "image") {
