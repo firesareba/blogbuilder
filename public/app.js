@@ -48,6 +48,7 @@ function initTabs() {
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("hidden", p.id !== `panel-${name}`));
+  if (name === "builder") refreshCanvasPostSelect();
   if (name === "posts" && !PostsState.loaded) loadPosts();
   if (name === "media") loadMedia();
   if (name === "git") loadGit();
@@ -180,8 +181,21 @@ function wireCanvasClicks(frame) {
     [data-builder-id] { outline-offset: 2px; cursor: pointer; }
     [data-builder-id].bb-hover { outline: 2px dashed #263A52; }
     [data-builder-id].bb-selected { outline: 2px solid #A3323B; }
+    [data-post-slug] { cursor: pointer; }
+    [data-post-slug].bb-post-hover { outline: 2px dashed #10b981; outline-offset: 2px; }
   `;
   doc.head.appendChild(style);
+
+  // Post cards open the in-builder markdown editor instead of navigating.
+  doc.querySelectorAll("[data-post-slug]").forEach((el) => {
+    el.addEventListener("mouseenter", () => el.classList.add("bb-post-hover"));
+    el.addEventListener("mouseleave", () => el.classList.remove("bb-post-hover"));
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openPostDrawer(el.getAttribute("data-post-slug"));
+    });
+  });
 
   doc.querySelectorAll("[data-builder-id]").forEach((el) => {
     el.addEventListener("mouseenter", () => el.classList.add("bb-hover"));
@@ -263,9 +277,7 @@ function renderInspector(node) {
     browseBtn.textContent = "Browse media library";
     browseBtn.style.marginTop = "-6px";
     browseBtn.addEventListener("click", async () => {
-      const items = await api("GET", "/media");
-      if (!items.length) return toast("No media uploaded yet - use the Media tab.");
-      const url = prompt(`Paste one of these URLs:\n${items.map((m) => m.url).join("\n")}`, items[0].url);
+      const url = await openImagePicker();
       if (url) runOp(() => api("POST", `/elements/${node.id}/image`, { src: url }));
     });
     body.appendChild(browseBtn);
@@ -446,19 +458,103 @@ async function runOp(fn) {
   }
 }
 
+// -- form modal (native prompt() replacement) -------------------------------
+// openFormModal({title, fields, okLabel}) -> values object or null.
+// fields: [{key, label, type: "text"|"select"|"textarea", options?, value?, placeholder?}]
+let formModalResolve = null;
+function openFormModal({ title, fields, okLabel }) {
+  const modal = document.getElementById("formModal");
+  document.getElementById("formModalTitle").textContent = title || "Dialog";
+  document.getElementById("formModalErr").textContent = "";
+  const wrap = document.getElementById("formModalFields");
+  wrap.innerHTML = "";
+  const inputs = {};
+  for (const f of fields) {
+    const div = document.createElement("div");
+    div.className = "field";
+    const label = document.createElement("label");
+    label.textContent = f.label;
+    div.appendChild(label);
+    let input;
+    if (f.type === "select") {
+      input = document.createElement("select");
+      for (const o of f.options || []) {
+        const opt = document.createElement("option");
+        opt.value = o.value; opt.textContent = o.label;
+        input.appendChild(opt);
+      }
+      input.value = f.value || "";
+    } else if (f.type === "textarea") {
+      input = document.createElement("textarea");
+      input.value = f.value || "";
+      if (f.placeholder) input.placeholder = f.placeholder;
+    } else {
+      input = document.createElement("input");
+      input.type = "text";
+      input.value = f.value || "";
+      if (f.placeholder) input.placeholder = f.placeholder;
+      input.setAttribute("autocomplete", "off");
+      input.setAttribute("spellcheck", "false");
+    }
+    input.id = `formModal-${f.key}`;
+    div.appendChild(input);
+    wrap.appendChild(div);
+    inputs[f.key] = input;
+  }
+  document.getElementById("formModalOk").textContent = okLabel || "OK";
+  modal.classList.remove("hidden");
+  const first = wrap.querySelector("input, select, textarea");
+  if (first) first.focus();
+  return new Promise((resolve) => { formModalResolve = resolve; });
+}
+function closeFormModal(result) {
+  document.getElementById("formModal").classList.add("hidden");
+  if (formModalResolve) {
+    const r = formModalResolve;
+    formModalResolve = null;
+    r(result);
+  }
+}
+function initFormModal() {
+  document.getElementById("formModalOk").addEventListener("click", () => {
+    const wrap = document.getElementById("formModalFields");
+    const values = {};
+    wrap.querySelectorAll("input, select, textarea").forEach((el) => {
+      values[el.id.replace(/^formModal-/, "")] = el.value;
+    });
+    closeFormModal(values);
+  });
+  document.getElementById("formModalCancel").addEventListener("click", () => closeFormModal(null));
+}
+
 // -- add element --------------------------------------------------------
 function initAddElement() {
   document.getElementById("addElementBtn").addEventListener("click", async () => {
-    const type = prompt("Element type: text, heading, button, image, link, container", "text");
-    if (!type) return;
     const containers = flatContainers(BuilderState.elements);
-    let parent = null;
-    if (containers.length) {
-      parent = prompt(`Parent container id (blank = top level):\n${containers.map((c) => c.id).join(", ")}`, "") || null;
-    }
-    const text = ["text", "heading", "button", "link"].includes(type) ? prompt("Initial text", "New element") : undefined;
+    const vals = await openFormModal({
+      title: "Add element",
+      okLabel: "Add element",
+      fields: [
+        {
+          key: "type", label: "Type", type: "select", value: "text",
+          options: ["text", "heading", "button", "image", "link", "container"].map((t) => ({ value: t, label: t })),
+        },
+        {
+          key: "parent", label: "Parent container", type: "select", value: "",
+          options: [{ value: "", label: "(top level)" }].concat(containers.map((c) => ({ value: c.id, label: c.id }))),
+        },
+        { key: "text", label: "Initial text (text / heading / button / link)", type: "text", value: "New element" },
+        { key: "href", label: "Link URL (links and buttons only)", type: "text", placeholder: "https://…" },
+        { key: "src", label: "Image URL (images only)", type: "text", placeholder: "/assets/… (or pick from Media)" },
+      ],
+    });
+    if (!vals) return;
+    const body = { type: vals.type, parent: vals.parent || null };
+    if (["text", "heading", "button", "link"].includes(vals.type) && vals.text) body.text = vals.text;
+    if (["link", "button"].includes(vals.type) && vals.href) body.href = vals.href;
+    if (vals.type === "image" && vals.src) body.src = vals.src;
     try {
-      await api("POST", "/elements", { type, parent, text });
+      await api("POST", "/elements", body);
       await loadElements();
       reloadCanvas();
       toast("Element added");
@@ -617,9 +713,13 @@ function buildRichTextToolbar() {
   return bar;
 }
 function exec(cmd, val) { document.getElementById("postBody").focus(); document.execCommand(cmd, false, val); }
-function insertLink() {
-  const url = prompt("Link URL");
-  if (url) exec("createLink", url);
+async function insertLink() {
+  const vals = await openFormModal({
+    title: "Insert link",
+    okLabel: "Insert",
+    fields: [{ key: "url", label: "Link URL", type: "text", placeholder: "https://…" }],
+  });
+  if (vals && vals.url) exec("createLink", vals.url);
 }
 
 async function runArticleAssist(action, editable, titleInput) {
@@ -675,10 +775,14 @@ async function savePost(slug) {
 
 function initNewPost() {
   document.getElementById("newPostBtn").addEventListener("click", async () => {
-    const title = prompt("Post title", "Untitled post");
-    if (!title) return;
+    const vals = await openFormModal({
+      title: "New post",
+      okLabel: "Create draft",
+      fields: [{ key: "title", label: "Post title", type: "text", value: "Untitled post" }],
+    });
+    if (!vals || !vals.title.trim()) return;
     try {
-      const post = await api("POST", "/posts", { title });
+      const post = await api("POST", "/posts", { title: vals.title.trim() });
       await loadPosts();
       openPost(post.slug);
       toast("Draft created");
@@ -745,7 +849,10 @@ async function loadMedia() {
         <button data-act="delete">Delete</button>
       </div>`;
     el.querySelector('[data-act="copy"]').addEventListener("click", () => {
-      navigator.clipboard.writeText(location.origin + m.url).then(() => toast("URL copied"));
+      // Portable repo-relative URL: works on the builder host AND the
+      // published site (publish rewrites /assets/… to page-relative).
+      // Committed + pushed assets resolve live on GitHub automatically.
+      navigator.clipboard.writeText(m.url).then(() => toast("URL copied"));
     });
     el.querySelector('[data-act="delete"]').addEventListener("click", async () => {
       if (!confirm(`Delete ${m.name}?`)) return;
@@ -753,6 +860,41 @@ async function loadMedia() {
       loadMedia();
     });
     grid.appendChild(el);
+  }
+}
+// -- image picker (media dropdown replacement) ------------------------------
+// Resolves to the picked portable /assets/… URL, or null on cancel.
+let imagePickerResolve = null;
+function openImagePicker() {
+  const modal = document.getElementById("imagePickerModal");
+  const grid = document.getElementById("imagePickerGrid");
+  grid.innerHTML = '<p class="muted small">Loading…</p>';
+  modal.classList.remove("hidden");
+  api("GET", "/media").then((items) => {
+    grid.innerHTML = "";
+    if (!items.length) {
+      grid.innerHTML = '<p class="muted small">No uploads yet — use the Media tab to add images.</p>';
+      return;
+    }
+    for (const m of items) {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "picker-cell";
+      cell.innerHTML = `<img src="${m.url}" loading="lazy" alt=""><span>${escapeHtml(m.name)}</span>`;
+      cell.addEventListener("click", () => closeImagePicker(m.url));
+      grid.appendChild(cell);
+    }
+  }).catch((e) => {
+    grid.innerHTML = `<p class="muted small">Couldn't load media: ${escapeHtml(e.message)}</p>`;
+  });
+  return new Promise((resolve) => { imagePickerResolve = resolve; });
+}
+function closeImagePicker(url) {
+  document.getElementById("imagePickerModal").classList.add("hidden");
+  if (imagePickerResolve) {
+    const r = imagePickerResolve;
+    imagePickerResolve = null;
+    r(url || null);
   }
 }
 function initMedia() {
@@ -1201,6 +1343,99 @@ function initSettings() {
 }
 
 // ===========================================================================
+// POST DRAWER - edit posts from the builder tab (markdown, no tab switching)
+// ===========================================================================
+let drawerSlug = null;
+
+async function openPostDrawer(slug) {
+  try {
+    const post = await api("GET", `/posts/${encodeURIComponent(slug)}`);
+    drawerSlug = post.slug;
+    document.getElementById("postDrawerTitle").textContent = `Edit: ${post.title}`;
+    document.getElementById("drawerPostTitle").value = post.title || "";
+    document.getElementById("drawerPostSlug").value = post.slug || "";
+    document.getElementById("drawerPostDate").value = post.date || "";
+    document.getElementById("drawerPostBody").value = post.body || "";
+    document.getElementById("drawerPostMeta").textContent =
+      `${(post.tags || []).join(", ") || "no tags"} · ${post.published ? "published" : "draft"}`;
+    document.getElementById("drawerPubBtn").textContent = post.published ? "Unpublish" : "Publish";
+    document.getElementById("drawerStatus").textContent = "";
+    document.getElementById("postDrawer").classList.remove("hidden");
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function closePostDrawer() {
+  document.getElementById("postDrawer").classList.add("hidden");
+  drawerSlug = null;
+}
+
+async function savePostDrawer() {
+  if (!drawerSlug) return;
+  const status = document.getElementById("drawerStatus");
+  status.textContent = "Saving…";
+  try {
+    const updated = await api("PUT", `/posts/${encodeURIComponent(drawerSlug)}`, {
+      title: document.getElementById("drawerPostTitle").value,
+      slug: document.getElementById("drawerPostSlug").value,
+      date: document.getElementById("drawerPostDate").value,
+      body: document.getElementById("drawerPostBody").value,
+    });
+    drawerSlug = updated.slug;
+    document.getElementById("drawerPostSlug").value = updated.slug;
+    document.getElementById("drawerPostMeta").textContent =
+      `${(updated.tags || []).join(", ") || "no tags"} · ${updated.published ? "published" : "draft"}`;
+    document.getElementById("drawerPubBtn").textContent = updated.published ? "Unpublish" : "Publish";
+    status.textContent = "Saved ✓";
+    reloadCanvas();
+    refreshCanvasPostSelect();
+    refreshStatusPill();
+  } catch (e) {
+    status.textContent = "";
+    toast(e.message, true);
+  }
+}
+
+async function toggleDrawerPublished() {
+  if (!drawerSlug) return;
+  try {
+    const post = await api("GET", `/posts/${encodeURIComponent(drawerSlug)}`);
+    await api("POST", `/posts/${encodeURIComponent(drawerSlug)}/${post.published ? "unpublish" : "publish"}`);
+    toast(post.published ? "Unpublished" : "Published");
+    await openPostDrawer(drawerSlug);
+    reloadCanvas();
+    refreshCanvasPostSelect();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function refreshCanvasPostSelect() {
+  const sel = document.getElementById("canvasPostSelect");
+  if (!sel) return;
+  try {
+    const posts = await api("GET", "/posts");
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Edit post…</option>' + posts.map((p) =>
+      `<option value="${escapeAttr(p.slug)}">${p.published ? "● " : "○ "}${escapeHtml(p.title)}</option>`).join("");
+    sel.value = cur;
+  } catch {
+    // Posts tab will surface the error; keep the builder usable.
+  }
+}
+
+function initPostDrawer() {
+  document.getElementById("postDrawerClose").addEventListener("click", closePostDrawer);
+  document.getElementById("drawerSaveBtn").addEventListener("click", savePostDrawer);
+  document.getElementById("drawerPubBtn").addEventListener("click", toggleDrawerPublished);
+  document.getElementById("canvasPostSelect").addEventListener("change", (e) => {
+    if (e.target.value) openPostDrawer(e.target.value);
+    e.target.value = "";
+  });
+}
+
+// ===========================================================================
 // PUBLISH
 // ===========================================================================
 function initPublish() {
@@ -1234,6 +1469,7 @@ function initPublish() {
 window.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initCanvas();
+  initFormModal();
   initAddElement();
   initNewPost();
   initMedia();
@@ -1241,6 +1477,8 @@ window.addEventListener("DOMContentLoaded", () => {
   initAiPanel();
   initSettings();
   initPublish();
+  initPostDrawer();
+  document.getElementById("imagePickerCancel").addEventListener("click", () => closeImagePicker(null));
   loadElements();
   refreshStatusPill();
   setInterval(refreshStatusPill, 8000);

@@ -36,6 +36,9 @@ function renderCollection(doc, containerEl, key, site) {
     const card = doc.createElement("a");
     card.className = "bb-post-card";
     card.setAttribute("href", `/blog/${post.slug}/`);
+    // Lets the builder canvas open this post for editing on click.
+    // Benign in published output.
+    card.setAttribute("data-post-slug", post.slug);
     const h = doc.createElement("h3");
     h.textContent = post.title;
     const meta = doc.createElement("p");

@@ -48,7 +48,10 @@
           <button class="vp-btn active" data-vp="desktop">Desktop</button>
           <button class="vp-btn" data-vp="mobile">Mobile</button>
         </div>
-        <span id="canvasHint" class="canvas-hint">Click to select · links navigate the preview</span>
+        <select id="canvasPostSelect" class="post-quick-select" aria-label="Edit a post without leaving the builder">
+          <option value="">Edit post…</option>
+        </select>
+        <span id="canvasHint" class="canvas-hint">Click to select · links navigate · post cards open the editor</span>
       </div>
       <div class="canvas-frame-wrap" id="canvasFrameWrap">
         <iframe id="previewFrame" class="canvas-frame" src="/api/preview"></iframe>
@@ -246,6 +249,57 @@
       <button id="aiApplyBtn" class="btn btn-primary btn-sm">Apply</button>
       <button id="aiCancelBtn" class="btn btn-ghost btn-sm">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- Generic form modal (replaces prompt() dialogs) -->
+<div id="formModal" class="modal hidden">
+  <div class="modal-box">
+    <h3 id="formModalTitle">Dialog</h3>
+    <div id="formModalFields" class="inspector-body" style="padding:0;margin-top:12px"></div>
+    <p class="auth-err" id="formModalErr" aria-live="polite"></p>
+    <div class="modal-actions">
+      <button id="formModalOk" class="btn btn-primary btn-sm">OK</button>
+      <button id="formModalCancel" class="btn btn-ghost btn-sm">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image picker (media library dropdown replacement) -->
+<div id="imagePickerModal" class="modal hidden">
+  <div class="modal-box modal-wide">
+    <h3>Media library</h3>
+    <p class="muted small">Pick an image — inserts its portable <span translate="no">/assets/…</span> URL, which works here and on the published site.</p>
+    <div id="imagePickerGrid" class="picker-grid"></div>
+    <div class="modal-actions">
+      <button id="imagePickerCancel" class="btn btn-ghost btn-sm">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- In-builder post editor drawer (markdown, no tab switching) -->
+<div id="postDrawer" class="drawer hidden" role="dialog" aria-label="Edit post">
+  <div class="drawer-head">
+    <strong id="postDrawerTitle">Edit post</strong>
+    <button id="postDrawerClose" class="btn btn-xs" aria-label="Close post editor">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="field"><label for="drawerPostTitle">Title</label>
+      <input type="text" id="drawerPostTitle"></div>
+    <div class="field-row">
+      <div class="field"><label for="drawerPostSlug">Slug</label>
+        <input type="text" id="drawerPostSlug"></div>
+      <div class="field"><label for="drawerPostDate">Date</label>
+        <input type="text" id="drawerPostDate"></div>
+    </div>
+    <div class="field"><label for="drawerPostBody">Body (Markdown)</label>
+      <textarea id="drawerPostBody" class="md-area" spellcheck="true"></textarea></div>
+    <p class="muted small" id="drawerPostMeta"></p>
+  </div>
+  <div class="drawer-foot">
+    <button id="drawerSaveBtn" class="btn btn-primary btn-sm">Save</button>
+    <button id="drawerPubBtn" class="btn btn-ghost btn-sm">Publish</button>
+    <span class="muted small" id="drawerStatus" aria-live="polite"></span>
   </div>
 </div>
 
