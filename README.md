@@ -55,3 +55,13 @@ The same setup screen (and later Settings / Git tab) covers:
 Env overrides (optional, checked before the env file): `ADMIN_USER`,
 `ADMIN_PASS` (plaintext, legacy), `ADMIN_PASS_HASH`, `AI_PROVIDER`,
 `AI_MODEL`, `AI_API_KEY`, `SESSION_SECRET`, `COOKIE_SECURE=1` (HTTPS only).
+
+#Photos
+<img width="2314" height="1119" alt="Screenshot 2026-09-06 at 10 58 35 PM" src="https://github.com/user-attachments/assets/563718e9-0185-49ee-8fc0-ccc0587679ba" />
+<img width="1755" height="981" alt="Screenshot 2026-09-06 at 10 59 07 PM" src="https://github.com/user-attachments/assets/007234aa-40cf-43a4-806b-fe9cdbf836fd" />
+<img width="1573" height="1247" alt="Screenshot 2026-09-06 at 11 00 15 PM" src="https://github.com/user-attachments/assets/49179aa9-5946-48c1-a183-881f0fb163c2" />
+<img width="1763" height="1095" alt="Screenshot 2026-09-06 at 11 00 00 PM" src="https://github.com/user-attachments/assets/ecdde4a1-a7de-48a8-bd51-195983ba6ed6" />
+<img width="1713" height="1181" alt="Screenshot 2026-09-06 at 10 59 47 PM" src="https://github.com/user-attachments/assets/38d1a5eb-009f-421b-b37d-23b7556aa9e5" />
+<img width="1263" height="797" alt="Screenshot 2026-09-06 at 10 59 26 PM" src="https://github.com/user-attachments/assets/4e128943-89a4-480b-9d8e-189cb4fa46ff" />
+
+
