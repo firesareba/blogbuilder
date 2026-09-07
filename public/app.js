@@ -823,6 +823,37 @@ function initGit() {
       ghPoll = setInterval(poll, 5000);
     } catch (e) { toast(e.message, true); }
   });
+  document.getElementById("ghRepoSelect").addEventListener("change", async (e) => {
+    const full = e.target.value;
+    if (!full) return;
+    const [owner, repo] = full.split("/");
+    document.getElementById("ghOwner").value = owner || "";
+    document.getElementById("ghRepo").value = repo || "";
+    try {
+      await api("POST", "/github/connect", { owner, repo });
+      toast(`Blog repo remote set to ${full}`);
+    } catch (err) { toast(err.message, true); }
+  });
+  document.getElementById("ghRepoRefreshBtn").addEventListener("click", loadGhRepos);
+  document.getElementById("ghCreateBtn").addEventListener("click", async () => {
+    const name = document.getElementById("ghNewRepo").value.trim();
+    if (!name) return toast("Enter a name for the new repo", true);
+    try {
+      toast("Creating repo…");
+      const r = await fetch("/api/auth/github/repos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Create failed");
+      const full = r.output.match(/[\w.-]+\/[\w.-]+/)?.[0] || name;
+      const [owner, repo] = full.includes("/") ? full.split("/") : [null, full];
+      if (owner) {
+        document.getElementById("ghOwner").value = owner;
+        document.getElementById("ghRepo").value = repo;
+        await api("POST", "/github/connect", { owner, repo });
+      }
+      toast(`Created ${full} and set as blog repo remote ✓`);
+      document.getElementById("ghNewRepo").value = "";
+      loadGhRepos();
+    } catch (e) { toast(e.message, true); }
+  });
   document.getElementById("ghTokenBtn").addEventListener("click", async () => {
     const token = document.getElementById("ghToken").value.trim();
     if (!token) return toast("Paste a token first", true);
@@ -848,8 +879,20 @@ async function refreshGhStatus() {
   try {
     const st = await fetch("/api/auth/github/status").then((r) => r.json());
     document.getElementById("ghStatusLine").textContent = st.loggedIn ? `Signed in as ${st.user} ✓` : "Not signed in to GitHub";
+    if (st.loggedIn) loadGhRepos();
   } catch {
     document.getElementById("ghStatusLine").textContent = "GitHub status unavailable";
+  }
+}
+async function loadGhRepos() {
+  const sel = document.getElementById("ghRepoSelect");
+  try {
+    const r = await fetch("/api/auth/github/repos").then((x) => x.json());
+    if (!r.ok) { sel.innerHTML = '<option value="">(sign in to GitHub first)</option>'; return; }
+    sel.innerHTML = '<option value="">Your repos…</option>' + (r.repos || []).map((repo) =>
+      `<option value="${escapeAttr(repo.nameWithOwner)}">${escapeHtml(repo.nameWithOwner)}${repo.isPrivate ? " (private)" : ""}</option>`).join("");
+  } catch {
+    sel.innerHTML = '<option value="">(could not load repos)</option>';
   }
 }
 

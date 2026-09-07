@@ -128,6 +128,15 @@ app.post("/api/auth/github/device/start", auth.authRequired, (req, res) => {
 app.get("/api/auth/github/device/poll", auth.authRequired, async (req, res) => {
   res.json(await ghAuth.pollDeviceFlow());
 });
+// Blog content repos (not the blogbuilder repo itself): list + create.
+app.get("/api/auth/github/repos", auth.authRequired, async (req, res) => {
+  res.json(await ghAuth.listRepos());
+});
+app.post("/api/auth/github/repos", auth.authRequired, async (req, res) => {
+  const r = await ghAuth.createRepo(req.body || {});
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
 
 app.get("/health", (req, res) => {
   const repoOk = fs.existsSync(currentRepoPath) && fs.existsSync(path.join(currentRepoPath, "content", "config.json"));

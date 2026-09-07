@@ -122,4 +122,31 @@ async function pollDeviceFlow() {
   return { active: true, code: f.code, url: f.url };
 }
 
-module.exports = { runGh, ghStatus, loginWithToken, setupGit, startDeviceFlow, pollDeviceFlow, GH_ENV };
+function listRepos(limit = 50) {
+  return new Promise((resolve) => {
+    execFile("gh", ["repo", "list", "--limit", String(limit), "--json", "nameWithOwner,description,isPrivate,updatedAt"], { env: GH_ENV, timeout: 20000 }, (err, stdout, stderr) => {
+      if (err) return resolve({ ok: false, error: (stderr || err.message).trim() });
+      try {
+        resolve({ ok: true, repos: JSON.parse(stdout || "[]") });
+      } catch (e) {
+        resolve({ ok: false, error: "Could not parse gh output" });
+      }
+    });
+  });
+}
+
+function createRepo({ name, description, isPrivate }) {
+  if (!name || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(name) && !/^[A-Za-z0-9_.-]+$/.test(name)) {
+    return Promise.resolve({ ok: false, error: "Repo name must be 'name' or 'owner/name'" });
+  }
+  const args = ["repo", "create", name, isPrivate === false ? "--public" : "--private", "--confirm"];
+  if (description) args.push("--description", description);
+  return new Promise((resolve) => {
+    execFile("gh", args, { env: GH_ENV, timeout: 30000 }, (err, stdout, stderr) => {
+      if (err) return resolve({ ok: false, error: (stderr || err.message).trim() });
+      resolve({ ok: true, output: (stdout || "").trim() });
+    });
+  });
+}
+
+module.exports = { runGh, ghStatus, loginWithToken, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, GH_ENV };

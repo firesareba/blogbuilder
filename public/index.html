@@ -114,12 +114,20 @@
             <button id="pushBtn" class="btn btn-primary btn-sm">Push</button>
             <button id="pullBtn" class="btn btn-ghost btn-sm">Pull</button>
           </div>
-          <h3 style="margin-top:24px">Connect repository</h3>
-          <p class="muted small">Owner + repo set a plain remote URL. Auth comes from the <span translate="no">gh</span> CLI credential helper — no token is ever embedded in git config.</p>
+          <h3 style="margin-top:24px">Blog repository</h3>
+          <p class="muted small">Pick one of your GitHub repos, create a new one for this blog, or enter owner/repo manually. Sets a plain remote URL — auth comes from the <span translate="no">gh</span> CLI credential helper.</p>
+          <div class="git-actions">
+            <select id="ghRepoSelect" style="flex:1"><option value="">Your repos…</option></select>
+            <button id="ghRepoRefreshBtn" class="btn btn-ghost btn-sm" aria-label="Refresh repository list">↻</button>
+          </div>
           <div class="git-actions">
             <input id="ghOwner" type="text" placeholder="owner" autocomplete="off" spellcheck="false">
             <input id="ghRepo" type="text" placeholder="repo" autocomplete="off" spellcheck="false">
             <button id="ghConnectBtn" class="btn btn-ghost btn-sm">Connect</button>
+          </div>
+          <div class="git-actions">
+            <input id="ghNewRepo" type="text" placeholder="new-repo-name" autocomplete="off" spellcheck="false">
+            <button id="ghCreateBtn" class="btn btn-ghost btn-sm">Create + connect</button>
           </div>
           <h3 style="margin-top:24px">GitHub auth (<span translate="no">gh</span> CLI)</h3>
           <p class="muted small" id="ghStatusLine">Checking…</p>
