@@ -127,7 +127,15 @@
           </div>
           <div class="git-actions">
             <input id="ghNewRepo" type="text" placeholder="new-repo-name" autocomplete="off" spellcheck="false">
+            <select id="ghNewVisibility" aria-label="New repository visibility">
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+            </select>
             <button id="ghCreateBtn" class="btn btn-ghost btn-sm">Create + connect</button>
+          </div>
+          <p class="muted small">GitHub Pages on a free plan needs a <b>public</b> repo serving <b>/docs</b> (repo Settings → Pages → Deploy from branch → <span translate="no">/docs</span>).</p>
+          <div class="git-actions">
+            <button id="ghMakePublicBtn" class="btn btn-ghost btn-sm">Make connected repo public</button>
           </div>
           <h3 style="margin-top:24px">GitHub auth (<span translate="no">gh</span> CLI)</h3>
           <p class="muted small" id="ghStatusLine">Checking…</p>

@@ -884,9 +884,10 @@ function initGit() {
   document.getElementById("ghCreateBtn").addEventListener("click", async () => {
     const name = document.getElementById("ghNewRepo").value.trim();
     if (!name) return toast("Enter a name for the new repo", true);
+    const isPrivate = document.getElementById("ghNewVisibility").value === "private";
     try {
       toast("Creating repo…");
-      const r = await fetch("/api/auth/github/repos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }).then((x) => x.json());
+      const r = await fetch("/api/auth/github/repos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, isPrivate }) }).then((x) => x.json());
       if (!r.ok) throw new Error(r.error || "Create failed");
       const full = r.output.match(/[\w.-]+\/[\w.-]+/)?.[0] || name;
       const [owner, repo] = full.includes("/") ? full.split("/") : [null, full];
@@ -898,6 +899,14 @@ function initGit() {
       toast(`Created ${full} and set as blog repo remote ✓`);
       document.getElementById("ghNewRepo").value = "";
       loadGhRepos();
+    } catch (e) { toast(e.message, true); }
+  });
+  document.getElementById("ghMakePublicBtn").addEventListener("click", async () => {
+    if (!confirm("Make the connected blog repo PUBLIC? Required for free GitHub Pages.")) return;
+    try {
+      const r = await fetch("/api/auth/github/visibility", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ visibility: "public" }) }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error || "Failed");
+      toast("Repo is now public — enable Pages on /docs ✓");
     } catch (e) { toast(e.message, true); }
   });
   document.getElementById("ghLogoutBtn").addEventListener("click", async () => {

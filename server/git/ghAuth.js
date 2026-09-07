@@ -210,6 +210,18 @@ function listRepos(limit = 50) {
   });
 }
 
+function setRepoVisibility(owner, repo, visibility) {
+  if (!owner || !repo || !["public", "private"].includes(visibility)) {
+    return Promise.resolve({ ok: false, error: "owner, repo and visibility=public|private required" });
+  }
+  return new Promise((resolve) => {
+    execFile("gh", ["repo", "edit", `${owner}/${repo}`, "--visibility", visibility, "--accept-visibility-change-conformance"], { env: GH_ENV, timeout: 30000 }, (err, stdout, stderr) => {
+      if (err) return resolve({ ok: false, error: (stderr || err.message).trim() });
+      resolve({ ok: true, output: (stdout || "").trim() });
+    });
+  });
+}
+
 function createRepo({ name, description, isPrivate }) {
   if (!name || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(name) && !/^[A-Za-z0-9_.-]+$/.test(name)) {
     return Promise.resolve({ ok: false, error: "Repo name must be 'name' or 'owner/name'" });
@@ -232,4 +244,4 @@ function createRepo({ name, description, isPrivate }) {
   });
 }
 
-module.exports = { runGh, ghStatus, loginWithToken, logout, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, GH_ENV };
+module.exports = { runGh, ghStatus, loginWithToken, logout, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, setRepoVisibility, GH_ENV };
