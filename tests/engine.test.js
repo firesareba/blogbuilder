@@ -52,6 +52,23 @@ describe("builderEngine", () => {
   });
 });
 
+describe("aiProvider", () => {
+  it("briefs the model on theme, repo and CLI before asking for ops", async () => {
+    const ai = require("../server/ai/aiProvider");
+    let seen = null;
+    ai.PROVIDERS.teststub = { chat: async (args) => { seen = args; return "[]"; } };
+    const ops = await ai.generateOperations({
+      provider: "teststub", apiKey: "x", instruction: "do things",
+      elements: [], site: { title: "T", postCount: 1, publishedCount: 1, posts: [{ slug: "a", title: "A" }] },
+    });
+    assert.deepEqual(ops, []);
+    assert.ok(seen.systemPrompt.includes("data-builder-id"), "theme anatomy briefed");
+    assert.ok(seen.systemPrompt.includes("blog set-text"), "CLI briefed");
+    assert.ok(seen.userPrompt.includes("a"), "published posts listed");
+    delete ai.PROVIDERS.teststub;
+  });
+});
+
 describe("renderer", () => {
   it("publishes homepage + post pages", () => {
     content.createPost(repo, { title: "P1" });

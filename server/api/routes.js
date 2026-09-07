@@ -230,7 +230,17 @@ function createRouter({ getRepoPath }) {
     };
     const body = validate(aiOpsSchema, merged);
     const elements = engine.getElements(req.repoPath);
-    const ops = await ai.generateOperations({ ...body, elements });
+    const site = loadSite(req.repoPath);
+    const ops = await ai.generateOperations({
+      ...body,
+      elements,
+      site: {
+        title: site.config.title,
+        postCount: site.posts.length,
+        publishedCount: site.posts.filter((p) => p.published).length,
+        posts: site.posts.filter((p) => p.published).map((p) => ({ slug: p.slug, title: p.title })),
+      },
+    });
     return { operations: ops };
   }));
   router.post("/ai/apply", wrap((req) => {

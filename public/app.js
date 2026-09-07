@@ -136,14 +136,43 @@ function initCanvas() {
   });
 }
 
+function navigatePreview(href) {
+  const frame = document.getElementById("previewFrame");
+  let url;
+  try { url = new URL(href, location.origin); }
+  catch { return; }
+  // External links leave the canvas entirely.
+  if (url.origin !== location.origin) {
+    window.open(href, "_blank", "noopener");
+    return;
+  }
+  // In-preview routing: the published site's real paths (/blog/:slug, /)
+  // don't exist on the builder host, so map them onto the preview API.
+  // Without this, clicking Home loads the builder GUI inside its own canvas.
+  const post = url.pathname.match(/^\/blog\/([^/]+)\/?$/);
+  frame.src = post
+    ? `/api/preview/blog/${encodeURIComponent(post[1])}`
+    : "/api/preview";
+}
+
 function wireCanvasClicks(frame) {
   let doc;
   try { doc = frame.contentDocument; } catch { return; }
   if (!doc) return;
 
-  // Prevent navigation inside the editor canvas.
-  doc.querySelectorAll("a, button").forEach((el) => {
-    el.addEventListener("click", (e) => e.preventDefault());
+  doc.querySelectorAll("a[href], button").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const href = el.getAttribute && el.getAttribute("href");
+      if (el.tagName === "A" && href && !href.startsWith("#")) {
+        // Real navigation: route inside the preview (selection still happens).
+        e.preventDefault();
+        navigatePreview(href);
+      } else if (el.tagName !== "A" || !href) {
+        // Buttons and href-less anchors: editor-only, never navigate.
+        e.preventDefault();
+      }
+      // Hash links (#section) fall through to native in-page scrolling.
+    });
   });
 
   const style = doc.createElement("style");

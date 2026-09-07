@@ -2,12 +2,12 @@
 /**
  * AI Provider
  * -----------
- * The AI is BYOK: the caller supplies { provider, apiKey } on every request.
- * The server never stores keys. The AI never touches HTML/files directly -
- * for site edits it can ONLY emit a JSON array of builder operations, which
- * the caller must review and apply through the normal builder API (see
- * server/api/routes.js `/ai/apply`). This keeps the AI as "just another
- * client" of the builder engine, same as the GUI and CLI.
+ * The AI is BYOK: the caller supplies { provider, apiKey } on every request,
+ * falling back to server-saved keys when present. The AI never touches
+ * HTML/files directly - for site edits it can ONLY emit a JSON array of
+ * builder operations, which the caller must review and apply through the
+ * normal builder API (see server/api/routes.js `/ai/apply`). This keeps the
+ * AI as "just another client" of the builder engine, same as the GUI/CLI.
  */
 
 const anthropic = require("./providers/anthropic");
@@ -34,6 +34,53 @@ Valid operations (respond with a JSON array containing ONLY these shapes):
 Only reference element ids that actually exist in the provided site map. Never invent HTML or CSS outside of the "style" object's known keys.
 `.trim();
 
+const BUILDER_GUIDE = `
+HOW BLOGBUILDER WORKS (read carefully - your operations must respect this):
+
+Repo layout (git is the database - every change is a plain file edit):
+  theme/index.html      the theme. Editable regions carry data-builder-id="...".
+                        You NEVER edit this file; overrides do that job.
+  theme/theme.css       theme stylesheet. Only changeable via update_style ops.
+  content/config.json   site title + collections, e.g. posts live in content/posts.
+  content/overrides.json every builder edit lands here (text/style/visibility,
+                        added elements). This is what your ops actually write.
+  content/posts/*.md    blog posts: YAML frontmatter + markdown body.
+  assets/               uploaded images, served at /assets/<file>.
+
+Theme anatomy:
+  - data-builder-id marks every editable element. Reference these ids exactly.
+  - data-builder-locked="true" elements (header/nav/footer) cannot be deleted
+    or reordered. Do not emit delete/reorder ops for them.
+  - data-builder-collection="posts" containers are AUTO-POPULATED from published
+    posts at render time. Never create content inside them manually.
+
+Blog model:
+  - Posts have slug/title/author/date/tags/featuredImage/published/excerpt/body.
+  - Only published posts appear in collection containers and in docs/ output.
+  - You cannot create/edit posts with ops - only theme elements. If the user
+    asks for post changes, emit NO ops (empty array) - the UI explains it.
+
+CLI equivalent (the GUI, CLI and you all drive the same REST API):
+  blog elements                       list the element tree (ids/tags/text)
+  blog set-text <id> <value>          update_text
+  blog set-image <id> <src> [alt]     update_image
+  blog set-link <id> <href>           update_link
+  blog move <id> --dx <px> --dy <px>  move
+  blog publish                        render docs/ + commit + push
+
+Workflow truths:
+  - The preview iframe (/api/preview) renders theme + overrides live; edits
+    appear without publishing.
+  - Publishing renders docs/ (GitHub Pages serves root or /docs only),
+    commits, and pushes. Remind the user to hit Publish for changes to go live.
+  - Prefer a few precise ops over many speculative ones. If an id from the
+    request doesn't exist in the site map, skip it rather than guessing.
+
+Response rules:
+  - Output ONLY the JSON array. No prose, no markdown fences, no commentary.
+  - An empty array [] is valid when nothing in the request maps to real elements.
+`.trim();
+
 function buildSitePrompt(elements) {
   const flatten = (nodes, depth = 0) => nodes.flatMap((n) => [
     `${"  ".repeat(depth)}- ${n.id} (${n.tag}${n.kind === "container" ? ", container" : ""}${n.collection ? ", collection:" + n.collection : ""}) ${n.text ? `text="${n.text}"` : ""}`.trim(),
@@ -42,11 +89,14 @@ function buildSitePrompt(elements) {
   return flatten(elements).join("\n");
 }
 
-async function generateOperations({ provider, apiKey, model, instruction, elements }) {
+async function generateOperations({ provider, apiKey, model, instruction, elements, site }) {
   const impl = PROVIDERS[provider];
-  if (!impl) throw new Error(`Unknown AI provider "${provider}"`);
-  const systemPrompt = `You are the AI copilot inside a website builder. You can ONLY modify the site by emitting builder operations - you never write raw HTML/CSS. Respond with ONLY a JSON array (no prose, no markdown fences) of operations.\n\n${OPERATION_SCHEMA_DOC}`;
-  const userPrompt = `Current site elements:\n${buildSitePrompt(elements)}\n\nUser request: ${instruction}\n\nRespond with the JSON array of operations only.`;
+  if (!impl || typeof impl.chat !== "function") throw new Error(`Unknown AI provider "${provider}"`);
+  const systemPrompt = `You are the AI copilot inside BlogBuilder, a git-native visual website builder. You can ONLY modify the site by emitting builder operations - you never write raw HTML/CSS. Respond with ONLY a JSON array (no prose, no markdown fences) of operations.\n\n${BUILDER_GUIDE}\n\n${OPERATION_SCHEMA_DOC}`;
+  const siteBlock = site
+    ? `Site: "${site.title || "untitled"}" - ${site.postCount || 0} posts (${site.publishedCount || 0} published).\nPublished posts:\n${(site.posts || []).map((p) => `- ${p.slug}: "${p.title}"`).join("\n") || "(none)"}\n\n`
+    : "";
+  const userPrompt = `${siteBlock}Current site elements:\n${buildSitePrompt(elements)}\n\nUser request: ${instruction}\n\nRespond with the JSON array of operations only.`;
   const raw = await impl.chat({
     apiKey, systemPrompt, userPrompt, model,
   });
