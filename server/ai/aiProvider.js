@@ -146,7 +146,7 @@ async function articleAssist({
 const MODEL_HINTS = {
   anthropic: "e.g. claude-sonnet-4-6",
   openai: "e.g. gpt-4o-mini",
-  google: "e.g. gemini-2.0-flash or gemini-1.5-flash",
+  google: "e.g. gemma-4-31b-it or gemini-2.5-flash",
 };
 
 function withContext(provider, model, err) {

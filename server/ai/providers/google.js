@@ -9,7 +9,7 @@
  */
 
 async function chat({ apiKey, systemPrompt, userPrompt, model }) {
-  const name = model || "gemini-1.5-flash";
+  const name = model || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(name)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     method: "POST",
