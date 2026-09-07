@@ -134,7 +134,9 @@ function startDeviceFlow() {
   }, 10 * 60 * 1000);
   if (pollTimer.unref) pollTimer.unref();
 
-  child.stdout.on("data", (d) => {
+  // NOTE: gh/survey prints interactive prompts (including the code line)
+  // to STDERR, not stdout — extraction must run on both streams.
+  const ingest = (d) => {
     flow.output += d.toString();
     // Tolerant match: between "code:" and the XXXX-XXXX code there may be
     // color bytes or other noise even with color disabled.
@@ -144,8 +146,9 @@ function startDeviceFlow() {
       flow.public.code = flow.code;
       try { child.stdin.write("\n"); } catch {}
     }
-  });
-  child.stderr.on("data", (d) => { flow.output += d.toString(); });
+  };
+  child.stdout.on("data", ingest);
+  child.stderr.on("data", ingest);
   child.on("close", async (exitCode) => {
     clearTimeout(pollTimer); clearTimeout(codeTimer); clearInterval(feed);
     // eslint-disable-next-line no-console
