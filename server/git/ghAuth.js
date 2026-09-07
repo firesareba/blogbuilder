@@ -159,7 +159,7 @@ async function pollDeviceFlow() {
     return { active: false, done: true, ok: true, user: st.user };
   }
   if (f.done) { activeFlow = null; return { active: false, done: true, ok: false, error: f.error }; }
-  return { active: true, code: f.code, url: f.url };
+  return { active: true, code: f.code, url: f.url, output: f.output.trim().slice(-300) };
 }
 
 function listRepos(limit = 50) {
@@ -179,11 +179,19 @@ function createRepo({ name, description, isPrivate }) {
   if (!name || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(name) && !/^[A-Za-z0-9_.-]+$/.test(name)) {
     return Promise.resolve({ ok: false, error: "Repo name must be 'name' or 'owner/name'" });
   }
-  const args = ["repo", "create", name, isPrivate === false ? "--public" : "--private", "--confirm"];
+  // NOTE: no --confirm flag (deprecated in recent gh); a name argument
+  // already makes creation non-interactive.
+  const args = ["repo", "create", name, isPrivate === false ? "--public" : "--private"];
   if (description) args.push("--description", description);
   return new Promise((resolve) => {
     execFile("gh", args, { env: GH_ENV, timeout: 30000 }, (err, stdout, stderr) => {
-      if (err) return resolve({ ok: false, error: (stderr || err.message).trim() });
+      if (err) {
+        let msg = (stderr || err.message).trim();
+        if (/not accessible by personal access token/i.test(msg)) {
+          msg += " — the token needs the 'repo' scope to create repos (or create the repo on github.com and pick it from the list instead).";
+        }
+        return resolve({ ok: false, error: msg });
+      }
       resolve({ ok: true, output: (stdout || "").trim() });
     });
   });

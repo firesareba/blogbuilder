@@ -824,9 +824,12 @@ function initGit() {
       if (r.alreadyIn) { msg.textContent = `Already connected as ${r.alreadyIn} ✓`; refreshGhStatus(); return; }
       if (r.error || !r.ok) throw new Error(r.error || "Could not start device flow");
       clearInterval(ghPoll);
+      let tries = 0;
       const poll = async () => {
         const pr = await fetch("/api/auth/github/device/poll").then((x) => x.json());
+        tries++;
         if (pr.code) msg.innerHTML = `Code: <b>${escapeHtml(pr.code)}</b> — enter it at <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a>`;
+        else if (tries >= 2 && pr.output) msg.textContent = "gh: " + pr.output.slice(-160);
         if (pr.done) { clearInterval(ghPoll); msg.textContent = pr.ok ? `Connected as ${pr.user} ✓` : `Failed: ${pr.error || "unknown"}`; refreshGhStatus(); }
         else if (!pr.code) msg.textContent = "Starting device flow…";
       };

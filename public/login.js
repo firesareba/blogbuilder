@@ -70,9 +70,12 @@ async function deviceStart() {
   if (d.alreadyIn) { $("ghErr").textContent = ""; $("ghStatus").textContent = "Already connected as " + d.alreadyIn + " ✓"; return; }
   $("ghDeviceBox").hidden = false;
   clearInterval(pollTimer);
+  let tries = 0;
   const poll = async () => {
     const pr = await fetch("/api/auth/github/device/poll").then((x) => x.json());
+    tries++;
     if (pr.code) $("ghCode").textContent = pr.code;
+    else if (tries >= 2 && pr.output) $("ghStatus").textContent = "gh: " + pr.output.slice(-160);
     if (pr.done) {
       clearInterval(pollTimer);
       $("ghStatus").textContent = pr.ok ? ("Connected as " + (pr.user || "GitHub") + " ✓") : ("Failed: " + (pr.error || "unknown"));
