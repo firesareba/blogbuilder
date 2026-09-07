@@ -227,27 +227,51 @@ function createRouter({ getRepoPath }) {
   router.post("/github/verify", wrap((req) => github.verifyToken(req.body)));
 
   // -- AI copilot ---------------------------------------------------------
-  router.post("/ai/operations", wrap(async (req) => {
+  // Runs fn with AI creds; on auth rejection with client-supplied creds,
+  // retries once with the server-saved key (a stale/bad browser key must
+  // not brick AI when a good server key exists). Transient 5xx gets one
+  // retry with the same creds.
+  async function withAiResilience(req, call) {
     const { getServerApiKey, getServerAI } = require("../middleware/auth");
     const srv = getServerAI();
-    const merged = {
+    const base = {
       provider: req.body?.provider || srv.provider || undefined,
       apiKey: req.body?.apiKey || getServerApiKey() || undefined,
       model: req.body?.model || srv.model || undefined,
-      instruction: req.body?.instruction,
     };
-    const body = validate(aiOpsSchema, merged);
+    const usedClientKey = !!req.body?.apiKey;
+    const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      return await call(clean(base));
+    } catch (e) {
+      if (usedClientKey && ai.isAuthError(e) && getServerApiKey()) {
+        return await call(clean({ ...base, apiKey: getServerApiKey() }));
+      }
+      if (ai.isTransientError(e)) {
+        await sleep(1500);
+        return await call(clean(base));
+      }
+      throw e;
+    }
+  }
+
+  router.post("/ai/operations", wrap(async (req) => {
+    validate(z.object({ instruction: z.string().min(1).max(10000) }), req.body);
     const elements = engine.getElements(req.repoPath);
     const site = loadSite(req.repoPath);
-    const ops = await ai.generateOperations({
-      ...body,
-      elements,
-      site: {
-        title: site.config.title,
-        postCount: site.posts.length,
-        publishedCount: site.posts.filter((p) => p.published).length,
-        posts: site.posts.filter((p) => p.published).map((p) => ({ slug: p.slug, title: p.title })),
-      },
+    const ops = await withAiResilience(req, async (creds) => {
+      const b = validate(aiOpsSchema, { ...creds, instruction: req.body?.instruction });
+      return ai.generateOperations({
+        ...b,
+        elements,
+        site: {
+          title: site.config.title,
+          postCount: site.posts.length,
+          publishedCount: site.posts.filter((p) => p.published).length,
+          posts: site.posts.filter((p) => p.published).map((p) => ({ slug: p.slug, title: p.title })),
+        },
+      });
     });
     return { operations: ops };
   }));
@@ -262,16 +286,9 @@ function createRouter({ getRepoPath }) {
     });
     return { results };
   }));
-  router.post("/ai/article-assist", wrap((req) => {
-    const { getServerApiKey, getServerAI } = require("../middleware/auth");
-    const srv = getServerAI();
-    return ai.articleAssist({
-      ...req.body,
-      provider: req.body?.provider || srv.provider || undefined,
-      apiKey: req.body?.apiKey || getServerApiKey() || undefined,
-      model: req.body?.model || srv.model || undefined,
-    });
-  }));
+  router.post("/ai/article-assist", wrap((req) =>
+    withAiResilience(req, async (creds) => ai.articleAssist({ ...req.body, ...creds }))
+  ));
 
   // -- markdown <-> html (used by the rich text editor for loading content) --
   router.post("/markdown/to-html", wrap((req) => {

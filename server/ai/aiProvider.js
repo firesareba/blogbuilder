@@ -97,9 +97,12 @@ async function generateOperations({ provider, apiKey, model, instruction, elemen
     ? `Site: "${site.title || "untitled"}" - ${site.postCount || 0} posts (${site.publishedCount || 0} published).\nPublished posts:\n${(site.posts || []).map((p) => `- ${p.slug}: "${p.title}"`).join("\n") || "(none)"}\n\n`
     : "";
   const userPrompt = `${siteBlock}Current site elements:\n${buildSitePrompt(elements)}\n\nUser request: ${instruction}\n\nRespond with the JSON array of operations only.`;
-  const raw = await impl.chat({
-    apiKey, systemPrompt, userPrompt, model,
-  });
+  let raw;
+  try {
+    raw = await impl.chat({ apiKey, systemPrompt, userPrompt, model });
+  } catch (e) {
+    throw withContext(provider, model, e);
+  }
   const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "");
   let ops;
   try {
@@ -115,7 +118,7 @@ async function articleAssist({
   provider, apiKey, model, action, text, context,
 }) {
   const impl = PROVIDERS[provider];
-  if (!impl) throw new Error(`Unknown AI provider "${provider}"`);
+  if (!impl || typeof impl.chat !== "function") throw new Error(`Unknown AI provider "${provider}"`);
   const instructions = {
     continue: "Continue writing from where the text leaves off, matching its tone and style. Return only the new text to append.",
     rewrite: "Rewrite the given text to be clearer and more engaging, preserving meaning. Return only the rewritten text.",
@@ -131,10 +134,40 @@ async function articleAssist({
   if (!instruction) throw new Error(`Unknown article assist action "${action}"`);
   const systemPrompt = "You are a writing assistant embedded in a blog editor. Follow the instruction exactly and return ONLY the requested text with no preamble, no explanation, and no markdown fences.";
   const userPrompt = `Instruction: ${instruction}\n\nContext: ${context || "(none)"}\n\nText:\n${text || "(empty)"}`;
-  const result = await impl.chat({
-    apiKey, systemPrompt, userPrompt, model,
-  });
+  let result;
+  try {
+    result = await impl.chat({ apiKey, systemPrompt, userPrompt, model });
+  } catch (e) {
+    throw withContext(provider, model, e);
+  }
   return result.trim();
 }
 
-module.exports = { generateOperations, articleAssist, PROVIDERS };
+const MODEL_HINTS = {
+  anthropic: "e.g. claude-sonnet-4-6",
+  openai: "e.g. gpt-4o-mini",
+  google: "e.g. gemini-2.0-flash or gemini-1.5-flash",
+};
+
+function withContext(provider, model, err) {
+  const msg = (err && err.message) || String(err);
+  let hint = "";
+  if (/not.?found|invalid.*model|does not exist/i.test(msg)) {
+    hint = ` Check the model name (${MODEL_HINTS[provider] || "see provider docs"}).`;
+  } else if (/invalid.*key|unauthorized|authentication|401/i.test(msg)) {
+    hint = " The API key was rejected - check Settings (a bad browser key overrides the server key).";
+  }
+  const e = new Error(`[${provider}${model ? "/" + model : ""}] ${msg}.${hint}`);
+  e.cause = err;
+  return e;
+}
+
+function isAuthError(err) {
+  return /invalid.*(key|api)|unauthorized|authentication|\b401\b/i.test((err && err.message) || "");
+}
+
+function isTransientError(err) {
+  return /\b50[0-3]\b|internal error|overloaded|rate.?limit|429|timeout|econnreset|socket hang up/i.test((err && err.message) || "");
+}
+
+module.exports = { generateOperations, articleAssist, PROVIDERS, isAuthError, isTransientError };
