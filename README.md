@@ -1,7 +1,5 @@
 # BlogBuilder
 
-AI-built (opencode + Muse Spark) git-native visual website &amp; blog builder. Honest status: functional prototype hardening toward production — security items first.
-
 ## Run
 
 ```bash
