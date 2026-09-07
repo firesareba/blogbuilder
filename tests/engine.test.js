@@ -20,7 +20,8 @@ function seedRepo() {
     collections: { posts: { dir: "content/posts", route: "/blog" } },
   }));
   fs.writeFileSync(path.join(repo, "theme", "index.html"),
-    '<html><body><h1 data-builder-id="headline">hi</h1><div data-builder-id="latest-posts" data-builder-collection="posts"></div></body></html>');
+    '<html><head><link rel="stylesheet" href="/theme.css"></head><body><a data-builder-id="nav-home" href="/">home</a><h1 data-builder-id="headline">hi</h1><img data-builder-id="pic" src="/assets/pic.png"><div data-builder-id="latest-posts" data-builder-collection="posts"></div></body></html>');
+  fs.writeFileSync(path.join(repo, "theme", "theme.css"), "body{background:url(/assets/bg.png)}");
   fs.writeFileSync(path.join(repo, "content", "overrides.json"), JSON.stringify({ overrides: {}, added: [] }));
 }
 
@@ -81,6 +82,25 @@ describe("site title", () => {
     const r = publishSite(repo);
     const html = require("fs").readFileSync(require("path").join(r.outDir, "index.html"), "utf8");
     assert.ok(html.includes("<title>Tab Title</title>"));
+  });
+});
+
+describe("pages-safe output", () => {
+  it("emits no root-absolute local URLs (subpath-proof) + .nojekyll", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const { publishSite } = require("../server/engine/renderer");
+    content.createPost(repo, { title: "Subpath Check" });
+    content.setPublished(repo, "subpath-check", true);
+    const r = publishSite(repo);
+    const files = ["index.html", path.join("blog", "subpath-check", "index.html")];
+    for (const f of files) {
+      const html = fs.readFileSync(path.join(r.outDir, f), "utf8");
+      const bad = [...html.matchAll(/(?:href|src)="(\/[^"/][^"]*)"/g)].map((m) => m[1]);
+      assert.deepEqual(bad, [], `${f} has root-absolute URLs: ${bad.join(", ")}`);
+    }
+    assert.ok(fs.existsSync(path.join(r.outDir, ".nojekyll")));
+    assert.ok(fs.existsSync(path.join(r.outDir, "index.html")));
   });
 });
 

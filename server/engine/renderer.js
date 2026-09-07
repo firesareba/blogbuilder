@@ -116,10 +116,36 @@ function applyModelToDom(doc, site) {
   }
 }
 
-function renderPage(themeHtml, site) {
+/**
+ * Rewrite root-absolute local URLs (href="/theme.css", src="/assets/x")
+ * into page-relative ones. Published output lives under an unknown subpath
+ * (e.g. username.github.io/repo/), where a leading "/" escapes to the
+ * domain root and every stylesheet/image/link 404s - the classic "raw
+ * HTML" Pages deployment. Preview keeps absolute URLs (served at root).
+ */
+function relativizeUrls(doc, depth) {
+  const prefix = "../".repeat(depth);
+  for (const el of doc.querySelectorAll("[href],[src]")) {
+    for (const attr of ["href", "src"]) {
+      const v = el.getAttribute(attr);
+      if (!v || !v.startsWith("/") || v.startsWith("//")) continue;
+      const rel = v.slice(1);
+      el.setAttribute(attr, prefix + (rel || "./"));
+    }
+  }
+}
+
+// Same treatment for url(/...) inside copied stylesheets.
+function relativizeCssUrls(cssText, depth) {
+  const prefix = "../".repeat(depth);
+  return cssText.replace(/url\(\s*\/([^/])/g, `url(${prefix}$1`);
+}
+
+function renderPage(themeHtml, site, opts = {}) {
   const dom = new JSDOM(themeHtml);
   const doc = dom.window.document;
   applyModelToDom(doc, site);
+  if (opts.relative) relativizeUrls(doc, opts.depth || 0);
   // config.json is the source of truth for the tab title, not whatever the
   // theme hardcoded - otherwise editing the title in Settings visibly
   // does nothing.
@@ -143,7 +169,7 @@ function renderPage(themeHtml, site) {
   return `<!DOCTYPE html>\n${dom.serialize().replace(/^<!DOCTYPE html>\n?/i, "")}`;
 }
 
-function renderPostPage(themeDir, site, post) {
+function renderPostPage(themeDir, site, post, opts = {}) {
   const postThemePath = path.join(themeDir, "post.html");
   const base = fs.existsSync(postThemePath)
     ? fs.readFileSync(postThemePath, "utf8")
@@ -161,6 +187,7 @@ function renderPostPage(themeDir, site, post) {
   if (bodyEl) bodyEl.innerHTML = marked.parse(post.body || "");
   const headEl = doc.querySelector("title");
   if (headEl) headEl.textContent = `${post.title} - ${site.config.title || "Blog"}`;
+  if (opts.relative) relativizeUrls(doc, opts.depth || 0);
 
   return `<!DOCTYPE html>\n${dom.serialize().replace(/^<!DOCTYPE html>\n?/i, "")}`;
 }
@@ -184,8 +211,9 @@ function publishSite(repoPath) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
 
-  // homepage
-  const homeHtml = renderPage(site.theme.html, site);
+  // homepage (depth 0) and post pages (depth 2: blog/<slug>/) get
+  // page-relative URLs so output works under any subpath.
+  const homeHtml = renderPage(site.theme.html, site, { relative: true, depth: 0 });
   fs.writeFileSync(path.join(outDir, "index.html"), homeHtml, "utf8");
 
   // published posts
@@ -194,7 +222,7 @@ function publishSite(repoPath) {
   for (const post of published) {
     const postDir = path.join(outDir, "blog", post.slug);
     fs.mkdirSync(postDir, { recursive: true });
-    fs.writeFileSync(path.join(postDir, "index.html"), renderPostPage(themeDir, site, post), "utf8");
+    fs.writeFileSync(path.join(postDir, "index.html"), renderPostPage(themeDir, site, post, { relative: true, depth: 2 }), "utf8");
   }
 
   // theme assets (css/js) and site assets
@@ -202,6 +230,10 @@ function publishSite(repoPath) {
     if (file === "index.html" || file === "post.html") continue;
     const s = path.join(themeDir, file);
     if (fs.statSync(s).isDirectory()) copyDir(s, path.join(outDir, file));
+    else if (file.endsWith(".css")) {
+      // Theme stylesheets land flat in outDir root (depth 0).
+      fs.writeFileSync(path.join(outDir, file), relativizeCssUrls(fs.readFileSync(s, "utf8"), 0), "utf8");
+    }
     else fs.copyFileSync(s, path.join(outDir, file));
   }
   copyDir(path.join(repoPath, "assets"), path.join(outDir, "assets"));
