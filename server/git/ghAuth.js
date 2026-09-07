@@ -15,7 +15,19 @@ const GH_ENV = {
   ...process.env,
   GH_CONFIG_DIR: process.env.GH_CONFIG_DIR || "/data/gh",
   HOME: process.env.HOME || "/data",
+  // Force plain output: gh decorates the one-time code with ANSI escapes
+  // when piped, which silently breaks code extraction (the code is there,
+  // the regex just can't see it through the escape bytes).
+  NO_COLOR: "1",
+  CLICOLOR: "0",
+  TERM: "dumb",
 };
+
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
+function stripAnsi(s) {
+  return String(s || "").replace(ANSI_RE, "");
+}
 
 function runGh(args, { input } = {}) {
   return new Promise((resolve) => {
@@ -124,9 +136,11 @@ function startDeviceFlow() {
 
   child.stdout.on("data", (d) => {
     flow.output += d.toString();
-    const m = flow.output.match(/one-time code:\s*([A-Z0-9-]+)/i);
+    // Tolerant match: between "code:" and the XXXX-XXXX code there may be
+    // color bytes or other noise even with color disabled.
+    const m = stripAnsi(flow.output).match(/one-time code:[^A-Z0-9]*([A-Z0-9]{4}-[A-Z0-9]{4})/i);
     if (m && !flow.code) {
-      flow.code = m[1].trim();
+      flow.code = m[1].trim().toUpperCase();
       flow.public.code = flow.code;
       try { child.stdin.write("\n"); } catch {}
     }
