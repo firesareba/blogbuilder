@@ -2,9 +2,10 @@
 /**
  * Renderer
  * --------
- * Produces plain HTML/CSS/JS in <repo>/dist from theme + overrides + posts.
+ * Produces plain HTML/CSS/JS in <repo>/docs from theme + overrides + posts.
  * No React, no build tooling required to view the output - it's a normal
- * static site deployable on its own (e.g. GitHub Pages).
+ * static site deployable on its own. Output goes to docs/ (not dist/)
+ * because GitHub Pages only serves the repo root or /docs.
  */
 
 const fs = require("fs");
@@ -157,34 +158,39 @@ function copyDir(src, dest) {
 
 function publishSite(repoPath) {
   const site = loadSite(repoPath);
-  const distDir = path.join(repoPath, "dist");
-  fs.rmSync(distDir, { recursive: true, force: true });
-  fs.mkdirSync(distDir, { recursive: true });
+  // docs/, not dist/: GitHub Pages serves the repo root or /docs only,
+  // so dist/ output leaves Pages with no index.html in a servable path.
+  const outDir = path.join(repoPath, "docs");
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.mkdirSync(outDir, { recursive: true });
 
   // homepage
   const homeHtml = renderPage(site.theme.html, site);
-  fs.writeFileSync(path.join(distDir, "index.html"), homeHtml, "utf8");
+  fs.writeFileSync(path.join(outDir, "index.html"), homeHtml, "utf8");
 
   // published posts
   const themeDir = path.dirname(site.theme.themePath);
   const published = site.posts.filter((p) => p.published);
   for (const post of published) {
-    const outDir = path.join(distDir, "blog", post.slug);
-    fs.mkdirSync(outDir, { recursive: true });
-    fs.writeFileSync(path.join(outDir, "index.html"), renderPostPage(themeDir, site, post), "utf8");
+    const postDir = path.join(outDir, "blog", post.slug);
+    fs.mkdirSync(postDir, { recursive: true });
+    fs.writeFileSync(path.join(postDir, "index.html"), renderPostPage(themeDir, site, post), "utf8");
   }
 
   // theme assets (css/js) and site assets
   for (const file of fs.existsSync(themeDir) ? fs.readdirSync(themeDir) : []) {
     if (file === "index.html" || file === "post.html") continue;
     const s = path.join(themeDir, file);
-    if (fs.statSync(s).isDirectory()) copyDir(s, path.join(distDir, file));
-    else fs.copyFileSync(s, path.join(distDir, file));
+    if (fs.statSync(s).isDirectory()) copyDir(s, path.join(outDir, file));
+    else fs.copyFileSync(s, path.join(outDir, file));
   }
-  copyDir(path.join(repoPath, "assets"), path.join(distDir, "assets"));
+  copyDir(path.join(repoPath, "assets"), path.join(outDir, "assets"));
+
+  // Tell GitHub Pages to serve files as-is (no Jekyll processing).
+  fs.writeFileSync(path.join(outDir, ".nojekyll"), "", "utf8");
 
   return {
-    outDir: distDir,
+    outDir,
     pagesWritten: 1 + published.length,
     publishedPosts: published.map((p) => p.slug),
   };

@@ -187,7 +187,23 @@ function createRouter({ getRepoPath }) {
     }
   });
 
-  router.post("/publish", wrap((req) => publishSite(req.repoPath)));
+  const publishSchema = z.object({
+    message: z.string().min(1).max(500).optional(),
+    push: z.boolean().optional(),
+  });
+  // Publish means the full pipeline: render to docs/ (GitHub Pages serves
+  // the repo root or /docs), commit, and push. Each stage reports honestly
+  // so the button never claims "published" when it only built locally.
+  router.post("/publish", wrap(async (req) => {
+    const { message, push: doPush } = validate(publishSchema, req.body || {});
+    const built = publishSite(req.repoPath);
+    const commitRes = await git.commit(req.repoPath, message || "Publish site via BlogBuilder");
+    let pushRes = { pushed: false, reason: "Push skipped (push: false)" };
+    if (doPush !== false) {
+      pushRes = await git.push(req.repoPath, {});
+    }
+    return { ...built, commit: commitRes, push: pushRes };
+  }));
 
   // -- git --------------------------------------------------------------------
   router.get("/git/status", wrap((req) => git.status(req.repoPath)));

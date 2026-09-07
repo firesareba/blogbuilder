@@ -172,7 +172,7 @@ app.post("/api/repo/load", (req, res) => {
 });
 
 // Serve the current repo's raw assets, e.g. /assets/photo.jpg, used by both
-// the live preview iframe and the published dist/ output during local dev.
+// the live preview iframe and the published docs/ output during local dev.
 app.use("/assets", (req, res, next) => {
   express.static(path.join(currentRepoPath, "assets"))(req, res, next);
 });
@@ -188,6 +188,10 @@ app.use((req, res, next) => {
 });
 
 // Serve the published static output too, for a "view published site" tab.
+// /docs is current output; /dist stays as a legacy mount for old repos.
+app.use("/docs", (req, res, next) => {
+  express.static(path.join(currentRepoPath, "docs"))(req, res, next);
+});
 app.use("/dist", (req, res, next) => {
   express.static(path.join(currentRepoPath, "dist"))(req, res, next);
 });

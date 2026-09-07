@@ -11,16 +11,29 @@
 const { Command } = require("commander");
 
 const BASE = process.env.BLOG_API_URL || "http://localhost:4321/api";
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const SESSION_FILE = process.env.BLOG_SESSION_FILE || path.join(os.homedir(), ".blogbuilder-session");
+
+function loadSession() {
+  try { return fs.readFileSync(SESSION_FILE, "utf8").trim() || null; }
+  catch { return null; }
+}
 
 async function api(method, urlPath, body) {
+  const headers = {};
+  if (body) headers["content-type"] = "application/json";
+  const session = loadSession();
+  if (session) headers.cookie = `session=${session}`;
   const res = await fetch(`${BASE}${urlPath}`, {
     method,
-    headers: body ? { "content-type": "application/json" } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error(`✗ ${data.error || res.statusText}`);
+    console.error(`✗ ${data.error || res.statusText}${res.status === 401 ? " (hint: run `blog login` first)" : ""}`);
     process.exitCode = 1;
     return null;
   }
@@ -184,9 +197,40 @@ program.command("media").description("List uploaded media").action(async () => {
 });
 
 // -- publish / preview ------------------------------------------------------
-program.command("publish").description("Render the site to dist/ (does NOT commit/push - use git commands for that)").action(async () => {
-  const data = await api("POST", "/publish");
-  if (data) console.log(`✓ published ${data.pagesWritten} page(s) to ${data.outDir}`);
+program.command("publish").description("Render to docs/, commit and push (full publish pipeline)").action(async () => {
+  const data = await api("POST", "/publish", {});
+  if (!data) return;
+  console.log(`✓ built ${data.pagesWritten} page(s) to ${data.outDir}`);
+  console.log(data.commit?.committed ? `✓ committed ${data.commit.commit}` : `– ${data.commit?.reason || "nothing committed"}`);
+  console.log(data.push?.pushed ? `✓ pushed to ${data.push.remote}/${data.push.branch}` : `– not pushed: ${data.push?.reason || "unknown"}`);
+});
+
+// -- auth ---------------------------------------------------------------------
+program.command("login").description("Sign in (saves session cookie for later commands)").action(async () => {
+  const rl = require("readline").createInterface({ input: process.stdin, output: process.stderr });
+  const ask = (q) => new Promise((r) => rl.question(q, r));
+  const username = (await ask("Username: ")).trim();
+  const password = await ask("Password: ");
+  rl.close();
+  const res = await fetch(`${BASE}/login`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username, password: password.trim() }),
+  });
+  if (!res.ok) {
+    console.error(`✗ ${((await res.json().catch(() => ({}))).error) || res.statusText}`);
+    process.exitCode = 1;
+    return;
+  }
+  const setCookie = res.headers.get("set-cookie") || "";
+  const m = setCookie.match(/session=([^;]+)/);
+  if (!m) { console.error("✗ no session cookie returned"); process.exitCode = 1; return; }
+  fs.writeFileSync(SESSION_FILE, decodeURIComponent(m[1]), { mode: 0o600 });
+  console.log("✓ signed in");
+});
+
+program.command("logout").description("Clear the saved CLI session").action(async () => {
+  try { fs.unlinkSync(SESSION_FILE); } catch {}
+  console.log("✓ signed out");
 });
 
 // -- git ----------------------------------------------------------------------

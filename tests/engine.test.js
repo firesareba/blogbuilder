@@ -58,6 +58,6 @@ describe("renderer", () => {
     content.setPublished(repo, "p1", true);
     const r = publishSite(repo);
     assert.equal(r.pagesWritten, 2);
-    assert.ok(fs.existsSync(path.join(repo, "dist", "index.html")));
+    assert.ok(fs.existsSync(path.join(repo, "docs", "index.html")));
   });
 });

@@ -1147,12 +1147,26 @@ function initSettings() {
 // PUBLISH
 // ===========================================================================
 function initPublish() {
-  document.getElementById("publishBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("publishBtn");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = "Publishing…";
     try {
-      const r = await api("POST", "/publish");
-      toast(`Published ${r.pagesWritten} page(s)`);
+      const r = await api("POST", "/publish", {});
+      const parts = [`Built ${r.pagesWritten} page(s) into docs/`];
+      parts.push(r.commit?.committed ? `Committed ${String(r.commit.commit || "").slice(0, 7)}` : "Nothing new to commit");
+      if (r.push?.pushed) parts.push(`Pushed to ${r.push.remote}/${r.push.branch} ✓`);
+      else parts.push(`Not pushed: ${r.push?.reason || "unknown"}`);
+      const failed = !r.push?.pushed;
+      toast(parts.join(" · "), failed);
+      refreshStatusPill();
+      loadGit();
     } catch (e) {
       toast(e.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
     }
   });
 }

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Publish outputs to `docs/` + `.nojekyll` (GitHub Pages serves root or `/docs` — `dist/` left Pages with no index.html)
+- Publish is now the full pipeline: render → commit → push, with per-stage reporting; button shows progress and never claims success on partial completion
+- CLI: `blog login`/`logout` (session file) so CLI mutations pass auth; `publish` follows the full pipeline
 - Fix: fatal `public/app.js` syntax error (duplicated `initSettings` close + theme upload handler), verified with `node --check`
 - Fix: unclosed `<div class="settings-scroll">` in Settings tab
 - Fix: Georgia Google Fonts import → Merriweather

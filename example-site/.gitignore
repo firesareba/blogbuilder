@@ -1,1 +1,2 @@
-/dist/
+# docs/ is the published site output (GitHub Pages serves it).
+# It MUST be committed - do not ignore it.
