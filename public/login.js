@@ -45,9 +45,26 @@ async function finishExtras() {
   }
   location.href = "/";
 }
+async function postJSONTimeout(url, body, ms = 25000) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try {
+    return await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined, signal: c.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 async function deviceStart() {
   $("ghErr").textContent = "";
-  const r = await fetch("/api/auth/github/device/start", { method: "POST" });
+  $("ghStatus").textContent = "Starting device flow…";
+  let r;
+  try {
+    r = await postJSONTimeout("/api/auth/github/device/start");
+  } catch {
+    $("ghStatus").textContent = "";
+    $("ghErr").textContent = "Start timed out — click again to retry.";
+    return;
+  }
   const d = await r.json();
   if (!r.ok) { $("ghErr").textContent = d.error || "Could not start device flow"; return; }
   if (d.alreadyIn) { $("ghErr").textContent = ""; $("ghStatus").textContent = "Already connected as " + d.alreadyIn + " ✓"; return; }

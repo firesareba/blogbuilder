@@ -68,13 +68,9 @@ function setupGit() {
 // --- device flow (single active flow per server) ---
 let activeFlow = null;
 
-async function startDeviceFlow() {
+function startDeviceFlow() {
   if (activeFlow && !activeFlow.done) return activeFlow.public;
-  // Already authed? Skip the flow entirely.
-  const already = await ghStatus().catch(() => ({ loggedIn: false }));
-  if (already.loggedIn) {
-    return { url: "https://github.com/login/device", code: null, alreadyIn: already.user };
-  }
+  // Respond immediately; the already-authed short-circuit happens in poll().
   // --hostname skips the account prompt. The remaining prompts (protocol,
   // git-credential setup, "press Enter to open browser") have sane defaults,
   // which we accept by feeding newlines: with no TTY, gh would otherwise

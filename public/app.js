@@ -809,9 +809,18 @@ function initGit() {
   refreshGhStatus();
   let ghPoll = null;
   document.getElementById("ghDeviceBtn").addEventListener("click", async () => {
+    const msg = document.getElementById("ghDeviceMsg");
+    msg.textContent = "Starting device flow…";
     try {
-      const r = await fetch("/api/auth/github/device/start", { method: "POST" }).then((x) => x.json());
-      const msg = document.getElementById("ghDeviceMsg");
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 25000);
+      let resp;
+      try {
+        resp = await fetch("/api/auth/github/device/start", { method: "POST", signal: c.signal });
+      } finally {
+        clearTimeout(t);
+      }
+      const r = await resp.json();
       if (r.alreadyIn) { msg.textContent = `Already connected as ${r.alreadyIn} ✓`; refreshGhStatus(); return; }
       if (r.error || !r.ok) throw new Error(r.error || "Could not start device flow");
       clearInterval(ghPoll);
@@ -823,7 +832,10 @@ function initGit() {
       };
       await poll();
       ghPoll = setInterval(poll, 5000);
-    } catch (e) { toast(e.message, true); }
+    } catch (e) {
+      msg.textContent = /abort/i.test(e.message) ? "Start timed out — click again to retry." : e.message;
+      toast(e.message, true);
+    }
   });
   document.getElementById("ghRepoSelect").addEventListener("change", async (e) => {
     const full = e.target.value;
