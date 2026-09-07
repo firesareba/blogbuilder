@@ -56,6 +56,23 @@ async function loginWithToken(token) {
   return ghStatus();
 }
 
+function logout() {
+  return new Promise((resolve) => {
+    execFile("gh", ["auth", "logout", "--hostname", "github.com"], { env: GH_ENV, timeout: 15000 }, async () => {
+      // Best-effort: also wipe any leftover token material so a reset is total.
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const dir = GH_ENV.GH_CONFIG_DIR;
+        for (const f of ["hosts.yml", "hosts.yaml"]) {
+          try { fs.unlinkSync(path.join(dir, f)); } catch {}
+        }
+      } catch {}
+      resolve(await ghStatus().catch(() => ({ loggedIn: false })));
+    });
+  });
+}
+
 function setupGit() {
   return new Promise((resolve, reject) => {
     execFile("gh", ["auth", "setup-git"], { env: GH_ENV, timeout: 20000 }, (err, stdout, stderr) => {
@@ -197,4 +214,4 @@ function createRepo({ name, description, isPrivate }) {
   });
 }
 
-module.exports = { runGh, ghStatus, loginWithToken, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, GH_ENV };
+module.exports = { runGh, ghStatus, loginWithToken, logout, setupGit, startDeviceFlow, pollDeviceFlow, listRepos, createRepo, GH_ENV };

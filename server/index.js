@@ -118,6 +118,11 @@ app.post("/api/auth/github/token", auth.authRequired, async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+// Clear/reset the saved GitHub credential (PAT or device token).
+app.post("/api/auth/github/logout", auth.authRequired, async (req, res) => {
+  const st = await ghAuth.logout();
+  res.json({ ok: !st.loggedIn, ...st });
+});
 app.post("/api/auth/github/device/start", auth.authRequired, (req, res) => {
   try {
     res.json({ ok: true, ...ghAuth.startDeviceFlow() });

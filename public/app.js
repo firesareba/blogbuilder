@@ -871,6 +871,16 @@ function initGit() {
       loadGhRepos();
     } catch (e) { toast(e.message, true); }
   });
+  document.getElementById("ghLogoutBtn").addEventListener("click", async () => {
+    if (!confirm("Clear the saved GitHub credential from this server?")) return;
+    try {
+      await fetch("/api/auth/github/logout", { method: "POST" });
+      document.getElementById("ghToken").value = "";
+      document.getElementById("ghRepoSelect").innerHTML = '<option value="">Your repos…</option>';
+      toast("GitHub credential cleared");
+      refreshGhStatus();
+    } catch (e) { toast(e.message, true); }
+  });
   document.getElementById("ghTokenBtn").addEventListener("click", async () => {
     const token = document.getElementById("ghToken").value.trim();
     if (!token) return toast("Paste a token first", true);
