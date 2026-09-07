@@ -87,10 +87,13 @@ async function startDeviceFlow() {
   activeFlow = flow;
   flow.public = { url: flow.url, code: null, startedAt: flow.startedAt };
 
+  // Keep answering for the whole life of the child: there may be more
+  // prompts after the code (browser step, keyring, etc.), and an unread
+  // prompt with no TTY hangs forever while the user waits.
   const feed = setInterval(() => {
-    if (flow.done || flow.code) { clearInterval(feed); return; }
+    if (flow.done) { clearInterval(feed); return; }
     try { child.stdin.write("\n"); } catch { clearInterval(feed); }
-  }, 400);
+  }, 1000);
   // No code within 30s = prompts didn't resolve; fail loudly, never hang.
   const codeTimer = setTimeout(() => {
     if (!flow.code && !flow.done) {
@@ -111,20 +114,26 @@ async function startDeviceFlow() {
     if (m && !flow.code) {
       flow.code = m[1].trim();
       flow.public.code = flow.code;
-      clearInterval(feed);
       try { child.stdin.write("\n"); } catch {}
     }
   });
   child.stderr.on("data", (d) => { flow.output += d.toString(); });
   child.on("close", async (exitCode) => {
     clearTimeout(pollTimer); clearTimeout(codeTimer); clearInterval(feed);
+    // eslint-disable-next-line no-console
+    console.log(`[gh] device flow child exited (${exitCode}). output tail: ${flow.output.trim().slice(-300)}`);
+    // Re-check status regardless of exit code: the token may have been
+    // written even if our bookkeeping missed it.
+    try {
+      const st = await ghStatus();
+      if (st.loggedIn) {
+        try { await setupGit(); } catch {}
+        flow.done = true; flow.ok = true;
+        return;
+      }
+    } catch {}
     if (exitCode === 0) {
-      try {
-        await setupGit();
-        const st = await ghStatus();
-        flow.done = true; flow.ok = st.loggedIn;
-        if (!st.loggedIn) flow.error = "gh login exited but status check failed";
-      } catch (e) { flow.done = true; flow.error = e.message; }
+      flow.done = true; flow.error = "gh login exited but status check failed";
     } else if (!flow.done) {
       flow.done = true; flow.error = "gh exited (" + exitCode + "): " + flow.output.trim().slice(-500);
     }
@@ -134,10 +143,22 @@ async function startDeviceFlow() {
 }
 
 async function pollDeviceFlow() {
-  if (!activeFlow) return { active: false };
+  if (!activeFlow) {
+    // No tracked flow (e.g. server restarted mid-approval, or the child
+    // died silently): the user may still have approved, so check directly.
+    const st = await ghStatus().catch(() => ({ loggedIn: false }));
+    if (st.loggedIn) return { active: false, done: true, ok: true, user: st.user };
+    return { active: false };
+  }
   const f = activeFlow;
+  // Belt and suspenders: if gh is authed now, complete no matter what.
+  const st = await ghStatus().catch(() => ({ loggedIn: false }));
+  if (st.loggedIn) {
+    try { await setupGit(); } catch {}
+    activeFlow = null;
+    return { active: false, done: true, ok: true, user: st.user };
+  }
   if (f.done && f.ok) {
-    const st = await ghStatus();
     activeFlow = null;
     return { active: false, done: true, ok: true, user: st.user };
   }
