@@ -996,7 +996,7 @@ async function loadThemes() {
       card.className = "theme-card";
       card.dataset.themeId = t.id;
       card.innerHTML = `
-        ${t.preview ? `<img src="${t.preview}" alt="${escapeHtml(t.name)} preview" onerror="this.style.display='none'">` : ''}
+        ${t.preview ? `<img src="${t.preview}" alt="${escapeHtml(t.name)} preview" data-hide-on-error>` : ''}
         <h3>${escapeHtml(t.name)}</h3>
         <p>${escapeHtml(t.description || "")}</p>
         <button class="btn btn-primary btn-sm apply-btn" ${selectedThemeId === t.id ? "disabled" : ""}>
@@ -1004,6 +1004,9 @@ async function loadThemes() {
         </button>
       `;
       card.querySelector(".apply-btn").addEventListener("click", () => applyTheme(t.id));
+      card.querySelectorAll("[data-hide-on-error]").forEach((img) => {
+        img.addEventListener("error", () => { img.style.display = "none"; });
+      });
       card.addEventListener("click", (e) => {
         if (e.target.classList.contains("apply-btn")) return;
         document.querySelectorAll(".theme-card").forEach(c => c.classList.remove("selected"));
