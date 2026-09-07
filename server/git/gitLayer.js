@@ -84,7 +84,11 @@ async function push(repoPath, { remote = "origin", branch } = {}) {
     await git.push(remote, currentBranch, ["--set-upstream"]);
     return { pushed: true, remote, branch: currentBranch };
   } catch (e) {
-    return { pushed: false, reason: e.message };
+    let reason = e.message;
+    if (/could not read Username/i.test(reason)) {
+      reason += " — git had no credential helper (gh CLI not wired). Reconnect GitHub in the Git tab, or restart the container to re-run setup.";
+    }
+    return { pushed: false, reason };
   }
 }
 
